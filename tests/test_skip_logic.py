@@ -9,11 +9,19 @@ def test_age_gt_60_skips_declared_questions():
         assert should_skip_action(action, state)
 
 
-def test_age_lt_42_skips_varilux_design_questions():
+def test_age_lt_42_skips_varilux_design_questions_but_keeps_driving_from_18():
     state = {"Q1_age": 36}
-    for action in [4, 5, 6, 7, 8, 9, 10]:
+    for action in [4, 6, 7, 8, 9, 10]:
         assert should_skip_action(action, state)
-    assert get_next_action(3, {"Q1_age": 36, "Q3_add": 1.75}) == 11
+    assert not should_skip_action(5, state)
+    assert get_next_action(3, {"Q1_age": 36, "Q3_add": 1.75}) == 5
+
+
+def test_driving_question_regulatory_age_boundary():
+    assert should_skip_action(5, {"Q1_age": 17})
+    assert not should_skip_action(5, {"Q1_age": 18})
+    assert get_next_action(3, {"Q1_age": 17, "Q3_add": 1.75}) == 11
+    assert get_next_action(3, {"Q1_age": 18, "Q3_add": 1.75}) == 5
 
 
 def test_duplicate_ai_question_is_skipped():

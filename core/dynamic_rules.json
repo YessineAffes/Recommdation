@@ -36,7 +36,8 @@
     }
   ],
   "skip_rules": [
-    {"skip_questions": [4, 5, 6, 7, 8, 9, 10], "condition": {"field": "age", "operator": "<", "value": 42}},
+    {"skip_questions": [4, 6, 7, 8, 9, 10], "condition": {"field": "age", "operator": "<", "value": 42}},
+    {"skip_questions": [5], "condition": {"field": "age", "operator": "<", "value": 18}},
     {"skip_questions": [10], "condition": {}},
     {"skip_questions": [6, 10, 11, 16, 17, 21], "condition": {"field": "age", "operator": ">", "value": 60}},
     {"skip_questions": [7], "condition": {"field": "Q4_usage_ordinateur", "operator": "!=", "value": "tres_souvent"}},
@@ -56,7 +57,7 @@
     {"id": 2, "qid": "Q2", "key": "montage", "state_key": "Q2_montage", "type": "choice", "label": "Quel type de montage ?", "options": [{"value": "nylor", "label": "Nylor"}, {"value": "plastique", "label": "Plastique"}, {"value": "metallique", "label": "Metallique"}, {"value": "perce", "label": "Perce"}], "skip_if": null},
     {"id": 3, "qid": "Q3", "key": "correction", "state_key": "Q3_correction_total", "type": "choice", "label": "Correction totale ?", "options": [{"value": "<200", "label": "Inferieure a 200"}, {"value": "225-400", "label": "Entre 225 et 400"}, {"value": "425-600", "label": "Entre 425 et 600"}, {"value": ">625", "label": "Superieure a 625"}, {"value": ">800", "label": "Superieure a 800"}], "sub_questions": [{"key": "add", "state_key": "Q3_add", "type": "number", "label": "Addition ADD", "min": 0.0, "step": 0.25}, {"key": "diff_od_og", "state_key": "Q3_diff_od_og", "type": "choice", "label": "Difference OD/OG", "options": [{"value": "<=200", "label": "<= 200"}, {"value": ">200", "label": "> 200"}]}], "skip_if": null},
     {"id": 4, "qid": "Q4", "key": "mouvement", "state_key": "Q4_vision_laterale", "type": "choice", "label": "Le client bouge surtout la tete ou les yeux ?", "options": [{"value": "tete", "label": "Tete"}, {"value": "yeux", "label": "Yeux"}, {"value": "mixte", "label": "Les deux"}], "skip_if": null},
-    {"id": 5, "qid": "Q5", "key": "conduite_nuit", "state_key": "Q4_conduite_nuit", "type": "boolean", "label": "Conduit-il souvent la nuit ?", "skip_if": null},
+    {"id": 5, "qid": "Q5", "key": "conduite_nuit", "state_key": "Q4_conduite_nuit", "type": "boolean", "label": "Conduit-il souvent la nuit ?", "skip_if": {"age": {"lt": 18}}},
     {"id": 6, "qid": "Q6", "key": "ordinateur", "state_key": "Q4_usage_ordinateur", "type": "choice", "label": "Usage ordinateur ?", "options": [{"value": "tres_souvent", "label": "Tres souvent"}, {"value": "parfois", "label": "Parfois"}, {"value": "jamais", "label": "Jamais"}], "skip_if": {"age": {"gt": 60}}},
     {"id": 7, "qid": "Q7", "key": "type_ordinateur", "state_key": "Q7_type_ordinateur", "type": "choice", "label": "Type d'ordinateur ?", "options": [{"value": "bureau", "label": "Bureau"}, {"value": "portable", "label": "Portable"}], "skip_if": {"Q4_usage_ordinateur": {"neq": "tres_souvent"}}},
     {"id": 8, "qid": "Q8", "key": "adaptation_facile", "state_key": "Q4_adaptation_facile", "type": "boolean", "label": "Recherche d'adaptation facile ?", "skip_if": null},
