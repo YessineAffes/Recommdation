@@ -148,6 +148,7 @@ class DecisionEngine:
         rules_path: str | Path | None = None,
         dynamic_rules_path: str | Path | None = None,
         corrections_store=None,
+        reload_on_decide: bool = True,
     ):
         selected = dynamic_rules_path
         if selected is None and rules_path is not None:
@@ -156,6 +157,7 @@ class DecisionEngine:
                 selected = candidate
         self.dynamic_rules_path = Path(selected) if selected else DYNAMIC_RULES_PATH
         self.corrections_store = corrections_store
+        self.reload_on_decide = reload_on_decide
         self.config = self._load_config()
         self.rules = self.config.model_dump()
         self._rebuild_indexes()
@@ -508,7 +510,8 @@ class DecisionEngine:
             draft.trace.append(f"{rid} appliquee: {param}={value}")
 
     def decide(self, state: dict[str, Any]) -> Recommendation:
-        self._reload_config()
+        if self.reload_on_decide:
+            self._reload_config()
         override = self._check_corrections(state)
         if override is not None:
             return override

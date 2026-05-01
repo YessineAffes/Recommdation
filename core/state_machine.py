@@ -113,9 +113,14 @@ def _next_candidate(current: int, state: dict[str, Any], rules: dict[str, Any]) 
     return default_next
 
 
-def get_next_action(current: int, state: dict[str, Any], rules_path: str | Path = DYNAMIC_RULES_PATH) -> int:
+def get_next_action(
+    current: int,
+    state: dict[str, Any],
+    rules_path: str | Path = DYNAMIC_RULES_PATH,
+    rules: dict[str, Any] | None = None,
+) -> int:
     """Navigation des 22 actions pilotee par dynamic_rules.json."""
-    rules = load_rules(rules_path)
+    rules = rules or load_rules(rules_path)
     if current >= 22:
         return 23
     nxt = _next_candidate(current, state, rules)

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -14,6 +15,7 @@ DOCS_PATH = ROOT / "rag" / "documents"
 COLLECTIONS = ["types_verres", "indices", "traitements", "couleurs"]
 
 
+@lru_cache(maxsize=1)
 def _client() -> chromadb.PersistentClient:
     DB_PATH.mkdir(parents=True, exist_ok=True)
     return chromadb.PersistentClient(path=str(DB_PATH), settings=Settings(anonymized_telemetry=False))

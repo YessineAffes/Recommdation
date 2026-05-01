@@ -10,7 +10,7 @@ import streamlit as st
 
 from core.corrections_store import HISTORY_CORRECTED, HISTORY_PENDING, HISTORY_VALIDATED, CorrectionsStore
 from core.decision_engine import DecisionEngine, Recommendation
-from core.state_machine import DYNAMIC_RULES_PATH, get_next_action, get_question_flow, should_skip_action
+from core.state_machine import DYNAMIC_RULES_PATH, get_next_action, should_skip_action
 from rag import rag_builder
 
 ROOT = Path(__file__).resolve().parent
@@ -34,9 +34,18 @@ STATUS_LABELS = {
 }
 
 
-def _load_rules() -> dict[str, Any]:
+def _rules_cache_token() -> int:
+    return DYNAMIC_RULES_PATH.stat().st_mtime_ns
+
+
+@st.cache_data(show_spinner=False)
+def _load_rules(rules_mtime_ns: int) -> dict[str, Any]:
     with open(DYNAMIC_RULES_PATH, "r", encoding="utf-8") as f:
         return json.load(f)
+
+
+def _question_flow(rules: dict[str, Any]) -> list[dict[str, Any]]:
+    return sorted(rules.get("questions", []), key=lambda q: int(q.get("id", 999)))
 
 
 def _question_options(question: dict[str, Any]) -> list[dict[str, str]]:
@@ -96,6 +105,30 @@ def _app_password() -> str:
     return os.getenv("OPTI_RECO_PASSWORD") or _streamlit_secret("OPTI_RECO_PASSWORD") or "expert123"
 
 
+def _database_url() -> str | None:
+    return os.getenv("DATABASE_URL") or _streamlit_secret("DATABASE_URL")
+
+
+@st.cache_resource(show_spinner=False)
+def _get_store(database_url: str | None) -> CorrectionsStore:
+    return CorrectionsStore(database_url=database_url)
+
+
+@st.cache_resource(show_spinner=False)
+def _get_engine(rules_mtime_ns: int) -> DecisionEngine:
+    return DecisionEngine(reload_on_decide=False)
+
+
+@st.cache_data(show_spinner=False, ttl=3600)
+def _get_rag_chunks(recommendation_payload: str, n: int) -> list[str]:
+    return rag_builder.get_justification(json.loads(recommendation_payload), n=n)
+
+
+@st.cache_data(show_spinner=False, ttl=15)
+def _list_history_cached(database_url: str, _store: CorrectionsStore, limit: int, status: str | None) -> list[dict[str, Any]]:
+    return _store.list_history(limit=limit, status=status)
+
+
 def _require_login() -> None:
     if st.session_state.authenticated:
         return
@@ -144,11 +177,11 @@ def _confidence(done: int, total: int, rec: Recommendation | None) -> int:
     return min(base, 98)
 
 
-def _try_live_reco(state: dict[str, Any]) -> Recommendation | None:
+def _try_live_reco(state: dict[str, Any], engine: DecisionEngine) -> Recommendation | None:
     if "Q1_age" not in state:
         return None
     try:
-        return DecisionEngine().decide(state)
+        return engine.decide(state)
     except Exception:
         return None
 
@@ -183,6 +216,7 @@ def _ensure_history_record(store: CorrectionsStore, state: dict[str, Any], rec: 
     if record_id is not None and store.get_history(int(record_id)) is not None:
         return int(record_id)
     record_id = store.create_history(state, rec.to_dict(), st.session_state.expert_name)
+    _list_history_cached.clear()
     st.session_state.current_recommendation_id = record_id
     return int(record_id)
 
@@ -452,6 +486,7 @@ def _render_expert_validation(
         expert_output = rec.to_dict()
         store.update_history(record_id, expert_output, HISTORY_VALIDATED, st.session_state.expert_name, notes)
         store.add(state, rec.to_dict(), expert_output, "CORRECT", notes, sync_history=False)
+        _list_history_cached.clear()
         st.success(f"Recommandation #{record_id} validee par l'expert.")
         st.rerun()
 
@@ -466,11 +501,12 @@ def _render_expert_validation(
     })
     store.update_history(record_id, expert_output, HISTORY_CORRECTED, st.session_state.expert_name, notes)
     store.add(state, rec.to_dict(), expert_output, "OVERRIDE", notes, sync_history=False)
+    _list_history_cached.clear()
     st.success(f"Correction expert enregistree pour la recommandation #{record_id}.")
     st.rerun()
 
 
-def _render_history(store: CorrectionsStore) -> None:
+def _render_history(store: CorrectionsStore, database_url: str | None) -> None:
     st.subheader("Historique")
     st.caption("Toutes les recommandations generees sont conservees, avec leur statut de validation expert.")
 
@@ -481,7 +517,7 @@ def _render_history(store: CorrectionsStore) -> None:
         "Validée": HISTORY_VALIDATED,
     }
     selected = st.selectbox("Filtrer", list(options.keys()), label_visibility="collapsed")
-    rows = store.list_history(limit=200, status=options[selected])
+    rows = _list_history_cached(database_url or "sqlite", store, 200, options[selected])
     if not rows:
         st.info("Aucune recommandation enregistree pour le moment.")
         return
@@ -563,7 +599,8 @@ def _render_final(
         for line in rec.trace:
             st.write(line)
         try:
-            chunks = rag_builder.get_justification(rec.to_dict(), n=2)
+            recommendation_payload = json.dumps(rec.to_dict(), sort_keys=True, ensure_ascii=False, default=str)
+            chunks = _get_rag_chunks(recommendation_payload, n=2)
         except Exception:
             chunks = []
         if chunks:
@@ -596,9 +633,12 @@ def main() -> None:
     _init_session()
     _require_login()
 
-    store = CorrectionsStore()
-    rules = _load_rules()
-    flow = get_question_flow()
+    database_url = _database_url()
+    rules_token = _rules_cache_token()
+    store = _get_store(database_url)
+    engine = _get_engine(rules_token)
+    rules = _load_rules(rules_token)
+    flow = _question_flow(rules)
     state = st.session_state.consultation_state
     current = int(st.session_state.current_action)
 
@@ -619,13 +659,13 @@ def main() -> None:
                 _reset_consultation()
                 st.rerun()
 
-        rec = _try_live_reco(state)
+        rec = _try_live_reco(state, engine)
         col1, col2, col3 = st.columns([1.35, 2.45, 1.25], gap="medium")
         with col1:
             done, total = _render_progress(flow, state, current, rules)
         with col2:
             if current > 22:
-                final_rec = DecisionEngine().decide(state)
+                final_rec = engine.decide(state)
                 record_id = _ensure_history_record(store, state, final_rec)
                 _render_final(final_rec, state, rules, store, record_id)
             else:
@@ -639,13 +679,13 @@ def main() -> None:
                         state.update(values)
                         main_value = values.get(question["state_key"])
                         st.session_state.last_feedback = _feedback_for(rules, question["state_key"], main_value)
-                        st.session_state.current_action = get_next_action(current, state)
+                        st.session_state.current_action = get_next_action(current, state, rules=rules)
                         st.rerun()
         with col3:
             _render_live_preview(rec, done, total)
 
     with tab_history:
-        _render_history(store)
+        _render_history(store, database_url)
 
 
 if __name__ == "__main__":
