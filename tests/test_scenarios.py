@@ -196,7 +196,7 @@ def test_crizal_ranking_never_downgrades():
     assert rec.traitement == "Crizal Prevencia"
 
 
-def test_crizal_same_rank_keeps_first_choice():
-    """Sapphire HR et Prevencia ont le meme rang: le premier choix reste conserve."""
+def test_health_signal_overrides_transparency_need():
+    """Une pathologie doit prioriser Prevencia, meme apres un besoin transparence."""
     rec = ENGINE.decide(_state(Q5_besoin_principal="transparence", Q6_sante_oculaire="glaucome"))
-    assert rec.traitement == "Crizal Sapphire HR"
+    assert rec.traitement == "Crizal Prevencia"
