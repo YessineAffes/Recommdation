@@ -1,0 +1,28 @@
+[0] 1) Fichier — Types de verres
+[1] Simple foyer
+[2] Eyezen
+[3] Varilux
+[4] Designs Varilux :
+[5] Varilux Liberty
+[6] Varilux Comfort Max
+[7] Varilux Physio
+[8] Varilux S Design
+[9] Varilux X Design
+[10] Varilux XR
+[11] 📄 2) Fichier — Indices
+[12] Indice 1.50
+[13] Indice 1.56
+[14] Indice 1.60
+[15] Indice 1.67
+[16] Indice 1.74
+[17] 📄 3) Fichier — Traitements
+[18] Crizal Sapphire HR
+[19] Crizal Prevencia
+[20] Crizal Drive
+[21] Crizal Rock
+[22] Crizal Easy Pro
+[23] 📄 4) Fichier — Couleurs
+[24] Blanc
+[25] Transitions (Photochromique)
+[26] Solaire
+[27] Polarisant

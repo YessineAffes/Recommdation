@@ -1,0 +1,16 @@
+{
+  "_comment": "Template JSON produit. Generee par admin/pages/product_form.py, ingeree par rag/rag_watcher.py.",
+  "_required": ["nom", "famille", "collection_cible"],
+
+  "nom": "",
+  "famille": "",
+  "sous_famille": "",
+  "description": "",
+  "indications": "",
+  "contre_indications": "",
+  "avantages": "",
+  "comparaison_precedent": "",
+  "collection_cible": "",
+  "source": "form",
+  "created_at": ""
+}

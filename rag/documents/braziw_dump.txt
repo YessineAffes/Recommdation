@@ -1,0 +1,102 @@
+[0] Action 1
+[1] 1. Quel âge avez-vous ?
+[2] Moins de 31 ans → recommander « Simple foyer ». On passe vers l’action 2
+[3] Entre 31 et 41 ans → recommander « Eyezen ». On passe vers l’action 2
+[4] 42 ans et plus → recommander « Varilux »
+ Si âge > 60 ans, ignorer les questions 6, 10, 11, 16, 17, 21 On passe vers l’action 2
+[5] Action 2
+[6] 2. Quel type de montage préférez-vous pour vos verres ?
+[7] Nylor → RAS. On passe vers l’action 3
+[8] Plastique → RAS. On passe vers l’action 3
+[9] Métallique → RAS. On passe vers l’action 3
+[10] Percé → recommander « Indice 1.60 minimum ». On passe vers l’action 3.5
+[11] Action 3
+[12] 3. Pouvez-vous me communiquer votre correction pour l’œil droit et l’œil gauche, ainsi que l’addition (ADD) ?
+[13] 3.1. Correction < 200 → recommander « Indice 1.50 ». On passe vers l’action 4
+[14] Correction 225–400 → recommander « Indice 1.56 ». On passe vers l’action 4
+[15] Correction 425–600 → recommander « Indice 1.60 ». On passe vers l’action 4
+[16] Correction > 625 → recommander « Indice 1.67 ». On passe vers l’action 4
+[17] ADD ≥ 2.25 → recommander « VARILUX S DESIGN ». On passe vers l’action 8
+[18] ADD > 2.50 → recommander « VARILUX X DESIGN ». On passe vers l’action 9
+[19] Différence OD/OG > 200 → recommander « VARILUX PHYSIO 3.0 ». On passe vers l’action 4
+[20] Action 4
+[21] 4. Lorsque vous regardez à droite et à gauche, comment utilisez-vous votre vision ?
+[22] Tête → recommander « VARILUX LIBERTY 3.0 ». On passe vers l’action 5
+[23] Yeux → recommander « VARILUX PHYSIO 3.0 ». On passe vers l’action 5
+[24] Les deux → recommander « VARILUX COMFORT 3.0 ». On passe vers l’action 5
+[25] Action 5
+[26] 5. Conduisez-vous très souvent la nuit ?
+[27] Oui → recommander « VARILUX COMFORT 3.0 ». On passe vers l’action 6
+[28] Non → RAS. On passe vers l’action 6
+[29] Action 6
+[30] 6. Utilisez-vous un ordinateur ?
+[31] Très souvent → recommander « VARILUX COMFORT MAX ». On passe vers l’action 7
+[32] Parfois → recommander « VARILUX COMFORT 3.0 ». On passe vers l’action 7
+[33] Rarement ou Jamais → recommander « VARILUX LIBERTY 3.0 ». On passe vers l’action 7
+[34] Action 7
+[35] 7. Utilisez-vous principalement :
+[36] Ordinateur de bureau → recommander Regular liberty. On passe vers l’action 8
+[37] Ordinateur portable → recommander Short. On passe vers l’action 8
+[38] Action 8
+[39] 8. Recherchez-vous une adaptation facile ?
+[40] Oui → recommander « VARILUX X DESIGN ». On passe vers l’action 9
+[41] Non → RAS. On passe vers l’action 9
+[42] Action 9
+[43] 9. Êtes-vous sensible aux nouvelles technologies ?
+[44] Oui → recommander « VARILUX XR ». On passe vers l’action 10
+[45] Non → RAS. On passe vers l’action 10
+[46] Action 10
+[47] 10. Souhaitez-vous une solution innovante (IA) ?
+[48] Oui → recommander « VARILUX XR ». On passe vers l’action 11
+[49] Non → RAS. On passe vers l’action 11
+[50] Action 11
+[51] 11. Quels sont vos principaux besoins en termes de verres ?
+[52] Transparence → recommander « CRIZAL SAPPHIRE HR ». On passe vers l’action 12
+[53] Lumière bleue → recommander « CRIZAL PREVENCIA ». On passe vers l’action 12
+[54] Conduite nuit → recommander « CRIZAL DRIVE ». On passe vers l’action 12
+[55] Résistance → recommander « CRIZAL ROCK ». On passe vers l’action 12
+[56] Nettoyage → recommander « CRIZAL EASY PRO ». On passe vers l’action 12
+[57] Action 12
+[58] 12. Peut-on avoir une idée de votre santé oculaire actuelle ?
+[59] RAS→ aucune modification. On passe vers l’action 13
+[60] Pathologie (glaucome, cataracte, DMLA, conjonctivite, rétinopathie diabétique, pseudophaque, aphakie) → recommander « CRIZAL PREVENCIA ». On passe vers l’action 13
+[61] Strabisme / insuffisance de convergence→ recommander physio ou liberty + short. On passe vers l’action 13
+[62] 13. Souhaitez-vous une paire principalement pour le soleil ?
+[63] Oui → recommander « Polarisant ». On passe vers l’action 14
+[64] Oui simple → recommander « Solaire ». On passe vers l’action 14
+[65] Action 14
+[66] 14. Êtes-vous souvent exposé à des reflets gênants ?
+[67] Oui → recommander « Polarisant ». On passe vers l’action 15
+[68] Non → aucune recommandation spécifique. On passe vers l’action 15
+[69] Action 15
+[70] 15. Avez-vous des difficultés à bien voir en plein soleil ?
+[71] Oui → recommander « Polarisant ». On passe vers l’action 16
+[72] Non → aucune recommandation spécifique. On passe vers l’action 16
+[73] Action 16
+[74] 16. Êtes-vous gêné par la lumière ?
+[75] Forte ou Moyenne → recommander « Transitions ». On passe vers l’action 17
+[76] Faible → recommander « Blanc ». On passe vers l’action 17
+[77] Action 17
+[78] 17. Dans quel environnement travaillez-vous ?
+[79] Extérieur ou Mixte → recommander « Transitions ». On passe vers l’action 18
+[80] Intérieur → recommander « Blanc ». On passe vers l’action 18
+[81] Action 18
+[82] 18. Préférez-vous des verres :
+[83] Plus légers → recommander indice élevé. On passe vers l’action 19
+[84] Plus robustes → recommander « CRIZAL ROCK ». On passe vers l’action 19
+[85] Action 19
+[86] 19. Avez-vous des antécédents familiaux de maladies oculaires ?
+[87] Oui → recommander « CRIZAL PREVENCIA ». On passe vers l’action 20
+[88] Non → aucune recommandation spécifique. On passe vers l’action 20
+[89] Action 20
+[90] 20. Avez-vous déjà subi une opération des yeux ?
+[91] Oui → recommander « CRIZAL PREVENCIA ». On passe vers l’action 21
+[92] Non → aucune recommandation spécifique. On passe vers l’action21
+[93] Action 21
+[94] 21. Souffrez-vous de fatigue oculaire à la fin de la journée ?
+[95] Oui → recommander « CRIZAL PREVENCIA ». On passe vers l’action 22
+[96] Non → aucune recommandation spécifique. On passe vers l’action 22
+[97] Action 22
+[98] 22. Avez-vous un style de vie actif (sport, extérieur fréquent) ?
+[99] Oui → recommander « CRIZAL ROCK ». On passe vers le résultat
+[100] Non → aucune recommandation spécifique. On passe vers le résultat

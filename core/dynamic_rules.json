@@ -1,0 +1,140 @@
+{
+  "version": "2.0",
+  "metadata": {
+    "last_updated": "2026-05-01",
+    "total_rules": 22,
+    "source": "braziw.docx + fichier_RAG.docx + speeches produits",
+    "decision_layer": "deterministic_only"
+  },
+  "policies": {
+    "type_verre_absolute": "Le type_verre est determine uniquement par age et jamais ecrase.",
+    "indice_perce_absolute": "Montage perce impose indice >= 1.60.",
+    "varilux_hierarchy": "Liberty < Comfort < Physio < S Design < X Design < XR. Le moteur conserve toujours le plus haut rang atteint.",
+    "crizal_hierarchy": "Easy Pro < Rock < Sapphire HR = Prevencia = Drive. Le moteur conserve le plus haut rang atteint et garde le premier choix en cas d'egalite.",
+    "rag_usage": "Le RAG explique seulement, il ne decide jamais."
+  },
+  "priority_rules": [
+    {
+      "id": 1,
+      "param": "type_verre",
+      "source": "age",
+      "state_key": "Q1_age",
+      "ranges": [
+        {"max": 30, "value": "Simple foyer"},
+        {"min": 31, "max": 41, "value": "Eyezen"},
+        {"min": 42, "value": "Varilux"}
+      ]
+    },
+    {
+      "id": 2,
+      "param": "indice",
+      "condition": {"field": "Q2_montage", "operator": "==", "value": "perce"},
+      "value": "1.60",
+      "mode": "min",
+      "override": true,
+      "reason": "Montage perce: indice 1.60 minimum absolu"
+    }
+  ],
+  "skip_rules": [
+    {"skip_questions": [6, 10, 11, 16, 17, 21], "condition": {"field": "age", "operator": ">", "value": 60}},
+    {"skip_questions": [7], "condition": {"field": "Q4_usage_ordinateur", "operator": "!=", "value": "tres_souvent"}},
+    {"skip_questions": [13, 14, 15], "condition": {"field": "couleur", "operator": "in", "value": ["Transitions X Polarized", "Polarisant"]}}
+  ],
+  "navigation_rules": [
+    {"from": 3, "condition": {"field": "Q3_add", "operator": ">=", "value": 2.5}, "next": 9},
+    {"from": 3, "condition": {"field": "Q3_add", "operator": ">=", "value": 2.25}, "next": 8},
+    {"from": 6, "condition": {"field": "Q4_usage_ordinateur", "operator": "==", "value": "tres_souvent"}, "next": 7},
+    {"from": 6, "default_next": 9},
+    {"from": 7, "default_next": 8}
+  ],
+  "questions": [
+    {"id": 1, "qid": "Q1", "key": "age", "state_key": "Q1_age", "type": "number", "label": "Quel est l'age du client ?", "min": 1, "skip_if": null},
+    {"id": 2, "qid": "Q2", "key": "montage", "state_key": "Q2_montage", "type": "choice", "label": "Quel type de montage ?", "options": [{"value": "nylor", "label": "Nylor"}, {"value": "plastique", "label": "Plastique"}, {"value": "metallique", "label": "Metallique"}, {"value": "perce", "label": "Perce"}], "skip_if": null},
+    {"id": 3, "qid": "Q3", "key": "correction", "state_key": "Q3_correction_total", "type": "choice", "label": "Correction totale ?", "options": [{"value": "<200", "label": "Inferieure a 200"}, {"value": "225-400", "label": "Entre 225 et 400"}, {"value": "425-600", "label": "Entre 425 et 600"}, {"value": ">625", "label": "Superieure a 625"}, {"value": ">800", "label": "Superieure a 800"}], "sub_questions": [{"key": "add", "state_key": "Q3_add", "type": "number", "label": "Addition ADD", "min": 0.0, "step": 0.25}, {"key": "diff_od_og", "state_key": "Q3_diff_od_og", "type": "choice", "label": "Difference OD/OG", "options": [{"value": "<=200", "label": "<= 200"}, {"value": ">200", "label": "> 200"}]}], "skip_if": null},
+    {"id": 4, "qid": "Q4", "key": "mouvement", "state_key": "Q4_vision_laterale", "type": "choice", "label": "Le client bouge surtout la tete ou les yeux ?", "options": [{"value": "tete", "label": "Tete"}, {"value": "yeux", "label": "Yeux"}, {"value": "mixte", "label": "Les deux"}], "skip_if": null},
+    {"id": 5, "qid": "Q5", "key": "conduite_nuit", "state_key": "Q4_conduite_nuit", "type": "boolean", "label": "Conduit-il souvent la nuit ?", "skip_if": null},
+    {"id": 6, "qid": "Q6", "key": "ordinateur", "state_key": "Q4_usage_ordinateur", "type": "choice", "label": "Usage ordinateur ?", "options": [{"value": "tres_souvent", "label": "Tres souvent"}, {"value": "parfois", "label": "Parfois"}, {"value": "jamais", "label": "Jamais"}], "skip_if": {"age": {"gt": 60}}},
+    {"id": 7, "qid": "Q7", "key": "type_ordinateur", "state_key": "Q7_type_ordinateur", "type": "choice", "label": "Type d'ordinateur ?", "options": [{"value": "bureau", "label": "Bureau"}, {"value": "portable", "label": "Portable"}], "skip_if": {"Q4_usage_ordinateur": {"neq": "tres_souvent"}}},
+    {"id": 8, "qid": "Q8", "key": "adaptation_facile", "state_key": "Q4_adaptation_facile", "type": "boolean", "label": "Recherche d'adaptation facile ?", "skip_if": null},
+    {"id": 9, "qid": "Q9", "key": "innovation", "state_key": "Q4_innovation", "type": "boolean", "label": "Client sensible aux nouvelles technologies ?", "skip_if": null},
+    {"id": 10, "qid": "Q10", "key": "solution_ia", "state_key": "Q10_solution_ia", "type": "boolean", "label": "Souhaite-t-il une solution IA ?", "skip_if": {"age": {"gt": 60}}},
+    {"id": 11, "qid": "Q11", "key": "besoin_verres", "state_key": "Q5_besoin_principal", "type": "choice", "label": "Besoin principal du verre ?", "options": [{"value": "transparence", "label": "Transparence"}, {"value": "lumiere_bleue", "label": "Lumiere bleue"}, {"value": "conduite_soir", "label": "Conduite de nuit"}, {"value": "rayures", "label": "Resistance rayures"}, {"value": "nettoyage", "label": "Nettoyage facile"}], "skip_if": {"age": {"gt": 60}}},
+    {"id": 12, "qid": "Q12", "key": "sante", "state_key": "Q6_sante_oculaire", "type": "choice", "label": "Sante oculaire ?", "options": [{"value": "ras", "label": "RAS"}, {"value": "pathologie", "label": "Pathologie"}, {"value": "strabisme_convergence", "label": "Strabisme / convergence"}, {"value": "pseudophaque", "label": "Pseudophaque"}, {"value": "aphakie", "label": "Aphakie"}, {"value": "cataracte", "label": "Cataracte"}, {"value": "glaucome", "label": "Glaucome"}, {"value": "dmla", "label": "DMLA"}, {"value": "conjonctivite", "label": "Conjonctivite"}, {"value": "retinopathie_diabetique", "label": "Retinopathie diabetique"}, {"value": "strabisme", "label": "Strabisme"}, {"value": "insuffisance_convergence", "label": "Insuffisance de convergence"}], "skip_if": null},
+    {"id": 13, "qid": "Q13", "key": "paire_soleil", "state_key": "Q13_paire_soleil", "type": "choice", "label": "Paire principalement pour le soleil ?", "options": [{"value": "non", "label": "Non"}, {"value": "oui_tres_expose", "label": "Oui, tres expose / reflets"}, {"value": "oui_usage_simple", "label": "Oui, usage simple"}], "skip_if": null},
+    {"id": 14, "qid": "Q14", "key": "reflets_genants", "state_key": "Q7_reflets_genants", "type": "boolean", "label": "Reflets genants ?", "skip_if": null},
+    {"id": 15, "qid": "Q15", "key": "mal_soleil", "state_key": "Q7_mal_voir_soleil", "type": "boolean", "label": "Difficulte a voir en plein soleil ?", "skip_if": null},
+    {"id": 16, "qid": "Q16", "key": "gene_lumiere", "state_key": "Q7_gene_lumiere", "type": "choice", "label": "Gene a la lumiere ?", "options": [{"value": "aucune", "label": "Aucune"}, {"value": "faible", "label": "Faible"}, {"value": "moyenne", "label": "Moyenne"}, {"value": "forte", "label": "Forte"}, {"value": "tres_forte", "label": "Tres forte"}], "skip_if": {"age": {"gt": 60}}},
+    {"id": 17, "qid": "Q17", "key": "environnement", "state_key": "Q7_environnement", "type": "choice", "label": "Environnement dominant ?", "options": [{"value": "interieur", "label": "Interieur"}, {"value": "exterieur", "label": "Exterieur"}, {"value": "mixte", "label": "Mixte"}], "skip_if": {"age": {"gt": 60}}},
+    {"id": 18, "qid": "Q18", "key": "preference_verre", "state_key": "Q18_preference_verre", "type": "choice", "label": "Preference du client ?", "options": [{"value": "aucune", "label": "Aucune"}, {"value": "plus_legers", "label": "Plus legers"}, {"value": "plus_robustes", "label": "Plus robustes"}], "skip_if": null},
+    {"id": 19, "qid": "Q19", "key": "antecedents", "state_key": "Q19_antecedents_familiaux", "type": "boolean", "label": "Antecedents familiaux oculaires ?", "skip_if": null},
+    {"id": 20, "qid": "Q20", "key": "operation_yeux", "state_key": "Q20_operation_yeux", "type": "boolean", "label": "Operation des yeux ?", "skip_if": null},
+    {"id": 21, "qid": "Q21", "key": "fatigue_oculaire", "state_key": "Q21_fatigue_oculaire", "type": "boolean", "label": "Fatigue oculaire en fin de journee ?", "skip_if": {"age": {"gt": 60}}},
+    {"id": 22, "qid": "Q22", "key": "style_actif", "state_key": "Q22_style_vie_actif", "type": "boolean", "label": "Style de vie actif ?", "skip_if": null}
+  ],
+  "engine": {
+    "defaults": {"traitement": "Crizal Sapphire HR", "couleur": "Blanc", "indice": "1.50"},
+    "index_rules": [
+      {"condition": {"field": "Q3_correction_total", "operator": "==", "value": "<200"}, "value": "1.50", "reason": "Correction faible"},
+      {"condition": {"field": "Q3_correction_total", "operator": "==", "value": "225-400"}, "value": "1.56", "reason": "Correction moyenne"},
+      {"condition": {"field": "Q3_correction_total", "operator": "==", "value": "425-600"}, "value": "1.60", "reason": "Correction elevee"},
+      {"condition": {"field": "Q3_correction_total", "operator": "==", "value": ">800"}, "value": "1.74", "reason": "Correction tres forte > 800"},
+      {"condition": {"field": "Q3_correction_total", "operator": "==", "value": ">625"}, "value": "1.67", "reason": "Correction forte"},
+      {"condition": {"field": "Q3_correction_total", "operator": ">", "value": 800}, "value": "1.74", "reason": "Correction numerique > 800"}
+    ],
+    "priority_design_rules": [
+      {"priority": 3, "condition": {"field": "Q3_add", "operator": ">=", "value": 2.5}, "value": "Varilux X Design", "reason": "ADD >= 2.50", "lock_design": true},
+      {"priority": 4, "condition": {"field": "Q3_add", "operator": ">=", "value": 2.25}, "value": "Varilux S Design", "reason": "ADD >= 2.25", "lock_design": true},
+      {"priority": 5, "condition": {"field": "Q3_diff_od_og", "operator": "==", "value": ">200"}, "value": "Varilux Physio 3.0", "reason": "Difference OD/OG > 200", "lock_design": true}
+    ],
+    "actions": [
+      {"id": 4, "effects": [{"param": "design_varilux", "condition": {"field": "Q4_vision_laterale", "operator": "==", "value": "tete"}, "value": "Varilux Liberty 3.0", "only_if_type": "Varilux", "reason": "Mouvement tete"}, {"param": "design_varilux", "condition": {"field": "Q4_vision_laterale", "operator": "==", "value": "yeux"}, "value": "Varilux Physio 3.0", "only_if_type": "Varilux", "reason": "Mouvement yeux"}, {"param": "design_varilux", "condition": {"field": "Q4_vision_laterale", "operator": "==", "value": "mixte"}, "value": "Varilux Comfort 3.0", "only_if_type": "Varilux", "reason": "Mouvement mixte"}]},
+      {"id": 5, "effects": [{"param": "design_varilux", "condition": {"field": "Q4_conduite_nuit", "operator": "==", "value": true}, "value": "Varilux Comfort 3.0", "only_if_type": "Varilux", "reason": "Conduite nuit"}]},
+      {"id": 6, "effects": [{"param": "design_varilux", "condition": {"field": "Q4_usage_ordinateur", "operator": "==", "value": "tres_souvent"}, "value": "Varilux Comfort Max", "only_if_type": "Varilux", "reason": "Usage ordinateur intensif"}, {"param": "design_varilux", "condition": {"field": "Q4_usage_ordinateur", "operator": "==", "value": "parfois"}, "value": "Varilux Comfort 3.0", "only_if_type": "Varilux", "reason": "Usage ordinateur occasionnel"}, {"param": "design_varilux", "condition": {"field": "Q4_usage_ordinateur", "operator": "==", "value": "jamais"}, "value": "Varilux Liberty 3.0", "only_if_type": "Varilux", "preserve_if": {"param": "design_varilux", "not_equals": null}, "reason": "Peu d'ordinateur"}]},
+      {"id": 7, "effects": [{"param": "corridor_type", "condition": {"field": "Q7_type_ordinateur", "operator": "==", "value": "bureau"}, "value": "Regular", "reason": "Ordinateur bureau"}, {"param": "extras", "condition": {"field": "Q7_type_ordinateur", "operator": "==", "value": "bureau"}, "value": "Alternative: Varilux Digitime Near/Mid/Room", "reason": "Presbyte connecte bureau"}, {"param": "corridor_type", "condition": {"field": "Q7_type_ordinateur", "operator": "==", "value": "portable"}, "value": "Short", "reason": "Ordinateur portable"}]},
+      {"id": 8, "effects": [{"param": "design_varilux", "condition": {"field": "Q4_adaptation_facile", "operator": "==", "value": true}, "value": "Varilux X Design", "only_if_type": "Varilux", "reason": "Adaptation facile"}]},
+      {"id": 9, "effects": [{"param": "design_varilux", "condition": {"field": "Q4_innovation", "operator": "==", "value": true}, "value": "Varilux XR", "only_if_type": "Varilux", "reason": "Innovation"}]},
+      {"id": 10, "effects": [{"param": "design_varilux", "condition": {"field": "Q10_solution_ia", "operator": "==", "value": true}, "value": "Varilux XR", "only_if_type": "Varilux", "reason": "Solution IA"}]},
+      {"id": 11, "effects": [{"param": "traitement", "condition": {"field": "Q5_besoin_principal", "operator": "==", "value": "transparence"}, "value": "Crizal Sapphire HR", "reason": "Besoin transparence"}, {"param": "traitement", "condition": {"field": "Q5_besoin_principal", "operator": "==", "value": "lumiere_bleue"}, "value": "Crizal Prevencia", "reason": "Protection lumiere bleue"}, {"param": "traitement", "condition": {"field": "Q5_besoin_principal", "operator": "==", "value": "conduite_soir"}, "value": "Crizal Drive", "reason": "Conduite de nuit"}, {"param": "traitement", "condition": {"field": "Q5_besoin_principal", "operator": "==", "value": "rayures"}, "value": "Crizal Rock", "reason": "Resistance rayures"}, {"param": "traitement", "condition": {"field": "Q5_besoin_principal", "operator": "==", "value": "nettoyage"}, "value": "Crizal Easy Pro", "reason": "Nettoyage facile"}]},
+      {"id": 12, "effects": [{"param": "traitement", "condition": {"field": "Q6_sante_oculaire", "operator": "in", "value": ["pathologie", "pseudophaque", "aphakie", "cataracte", "glaucome", "dmla", "conjonctivite", "retinopathie_diabetique"]}, "value": "Crizal Prevencia", "reason": "Pathologie oculaire"}, {"param": "design_varilux", "condition": {"field": "Q6_sante_oculaire", "operator": "in", "value": ["strabisme_convergence", "strabisme", "insuffisance_convergence"]}, "value": "Varilux Physio 3.0", "only_if_type": "Varilux", "reason": "Strabisme/convergence"}, {"param": "corridor_type", "condition": {"field": "Q6_sante_oculaire", "operator": "in", "value": ["strabisme_convergence", "strabisme", "insuffisance_convergence"]}, "value": "Short", "reason": "Strabisme/convergence"}]},
+      {"id": 13, "effects": [{"param": "couleur", "condition": {"field": "Q13_paire_soleil", "operator": "==", "value": "oui_tres_expose"}, "value": "Transitions X Polarized", "reason": "Soleil intense / reflets"}, {"param": "couleur", "condition": {"field": "Q13_paire_soleil", "operator": "==", "value": "oui_usage_simple"}, "value": "Solaire", "reason": "Usage soleil simple"}, {"param": "couleur", "condition": {"all": [{"field": "Q7_paire_soleil", "operator": "==", "value": true}, {"field": "Q7_reflets_genants", "operator": "==", "value": true}]}, "value": "Transitions X Polarized", "reason": "Legacy solaire + reflets"}, {"param": "couleur", "condition": {"field": "Q7_paire_soleil", "operator": "==", "value": true}, "value": "Solaire", "reason": "Legacy paire soleil"}]},
+      {"id": 14, "effects": [{"param": "couleur", "condition": {"field": "Q7_reflets_genants", "operator": "==", "value": true}, "value": "Transitions X Polarized", "reason": "Reflets genants"}]},
+      {"id": 15, "effects": [{"param": "couleur", "condition": {"field": "Q7_mal_voir_soleil", "operator": "==", "value": true}, "value": "Transitions X Polarized", "reason": "Difficulte en plein soleil"}]},
+      {"id": 16, "effects": [{"param": "couleur", "condition": {"field": "Q7_gene_lumiere", "operator": "in", "value": ["moyenne", "forte", "tres_forte"]}, "value": "Transitions Gen S", "preserve_if": {"param": "couleur", "not_equals": "Blanc"}, "reason": "Gene lumineuse"}, {"param": "couleur", "condition": {"field": "Q7_gene_lumiere", "operator": "in", "value": ["aucune", "faible"]}, "value": "Blanc", "preserve_if": {"param": "couleur", "not_equals": "Blanc"}, "reason": "Gene lumineuse faible"}]},
+      {"id": 17, "effects": [{"param": "couleur", "condition": {"field": "Q7_environnement", "operator": "in", "value": ["exterieur", "mixte"]}, "value": "Transitions Gen S", "preserve_if": {"param": "couleur", "not_equals": "Blanc"}, "reason": "Environnement exterieur/mixte"}, {"param": "couleur", "condition": {"all": [{"field": "Q7_environnement", "operator": "in", "value": ["exterieur", "mixte"]}, {"field": "Q4_conduite_nuit", "operator": "==", "value": true}]}, "value": "Transitions XTRActive", "preserve_if": {"param": "couleur", "not_equals": "Blanc"}, "reason": "Conduite + exposition"}]},
+      {"id": 18, "effects": [{"param": "indice", "condition": {"field": "Q18_preference_verre", "operator": "==", "value": "plus_legers"}, "value": "1.60", "mode": "min", "reason": "Preference verres plus legers"}, {"param": "traitement", "condition": {"field": "Q18_preference_verre", "operator": "==", "value": "plus_robustes"}, "value": "Crizal Rock", "preserve_if": {"param": "traitement", "equals": "Crizal Prevencia"}, "reason": "Preference verres robustes"}, {"param": "extras", "condition": {"field": "Q18_preference_verre", "operator": "==", "value": "plus_robustes"}, "value": "Robustesse: Crizal Rock", "reason": "Preference robustesse"}]},
+      {"id": 19, "effects": [{"param": "traitement", "condition": {"field": "Q19_antecedents_familiaux", "operator": "==", "value": true}, "value": "Crizal Prevencia", "reason": "Antecedents familiaux"}]},
+      {"id": 20, "effects": [{"param": "traitement", "condition": {"field": "Q20_operation_yeux", "operator": "==", "value": true}, "value": "Crizal Prevencia", "reason": "Operation yeux"}]},
+      {"id": 21, "effects": [{"param": "traitement", "condition": {"field": "Q21_fatigue_oculaire", "operator": "==", "value": true}, "value": "Crizal Prevencia", "reason": "Fatigue oculaire"}]},
+      {"id": 22, "effects": [{"param": "traitement", "condition": {"field": "Q22_style_vie_actif", "operator": "==", "value": true}, "value": "Crizal Rock", "preserve_if": {"param": "traitement", "equals": "Crizal Prevencia"}, "reason": "Style de vie actif"}, {"param": "extras", "condition": {"field": "Q22_style_vie_actif", "operator": "==", "value": true}, "value": "Style actif: Crizal Rock", "reason": "Style de vie actif"}]
+      }
+    ]
+  },
+  "feedback_messages": {
+    "Q4_usage_ordinateur": {"tres_souvent": {"level": "success", "message": "Varilux Comfort Max recommande: FlexOptim et zone utile elargie."}, "parfois": {"level": "success", "message": "Varilux Comfort 3.0: design progressif polyvalent."}, "jamais": {"level": "success", "message": "Varilux Liberty 3.0: adaptation rapide pour usage peu digital."}},
+    "Q5_besoin_principal": {"lumiere_bleue": {"level": "success", "message": "Crizal Prevencia sera priorise pour la lumiere bleue."}, "conduite_soir": {"level": "warning", "message": "Crizal Drive sera recommande pour conduite de nuit."}, "rayures": {"level": "success", "message": "Crizal Rock renforce la resistance."}},
+    "Q6_sante_oculaire": {"glaucome": {"level": "warning", "message": "Pathologie detectee: Crizal Prevencia prioritaire."}, "strabisme_convergence": {"level": "warning", "message": "Strabisme/convergence: corridor Short et Physio si Varilux."}},
+    "Q13_paire_soleil": {"oui_tres_expose": {"level": "warning", "message": "Soleil intense/reflets: Transitions X Polarized."}, "oui_usage_simple": {"level": "success", "message": "Usage soleil simple: solaire classique."}}
+  },
+  "product_badges": {
+    "Simple foyer": {"color": "#AED6F1", "icon": "eye", "label": "Usage general"},
+    "Eyezen": {"color": "#A9DFBF", "icon": "screen", "label": "Anti-fatigue 31-41 ans"},
+    "Varilux": {"color": "#00B4D8", "icon": "lens", "label": "Progressif"},
+    "Varilux Liberty 3.0": {"color": "#2E86C1", "icon": "star", "label": "Nouveau presbyte"},
+    "Varilux Comfort 3.0": {"color": "#38BDF8", "icon": "monitor", "label": "Progressif confort"},
+    "Varilux Comfort Max": {"color": "#00B4D8", "icon": "monitor", "label": "Ecran intensif"},
+    "Varilux Physio 3.0": {"color": "#22C55E", "icon": "target", "label": "Precision visuelle"},
+    "Varilux X Design": {"color": "#F4D03F", "icon": "bolt", "label": "Premium actif"},
+    "Varilux S Design": {"color": "#8E44AD", "icon": "target", "label": "Vision stable"},
+    "Varilux XR": {"color": "#E74C3C", "icon": "ai", "label": "Innovation IA"},
+    "Varilux Digitime": {"color": "#E67E22", "icon": "phone", "label": "Bureautique connecte"}
+  },
+  "rag_tech_messages": {
+    "Varilux Comfort Max": "FlexOptim, 227 postures supplementaires, zone utile elargie.",
+    "Varilux X Design": "Xtend, Nanoptix, vision a portee de bras 40-70 cm.",
+    "Varilux S Design": "Nanoptix et SynchronEyes, reduction de l'effet de tangage.",
+    "Transitions Gen S": "Usage quotidien, fonce rapidement et redevient clair en moins de 2 minutes.",
+    "Varilux Liberty 3.0": "Path Optimizer et champ visuel elargi.",
+    "Varilux Digitime": "Ultra Near Focus, declinaisons Near/Mid/Room."
+  },
+  "rules": []
+}
