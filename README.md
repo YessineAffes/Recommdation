@@ -53,7 +53,7 @@ LLM_PROVIDER=ollama python app.py
 
 - Le code metier ne depend pas du provider LLM.
 - `core/decision_engine.py` lit exclusivement `core/dynamic_rules.json`.
-- En mode `ollama`, aucune cle API cloud n'est requise.
+- En mode `ollama`, aucune cle API n'est requise.
 
 ## Validation expert et historique
 
@@ -71,6 +71,41 @@ Les donnees sont stockees dans `corrections.db` avec deux tables :
 - `recommendation_history` : historique complet des recommandations generees, corrigees ou validees.
 
 Aucune ancienne donnee n'est supprimee. Au demarrage, les anciennes corrections sont migrees dans l'historique si elles n'y sont pas deja.
+
+### Version cloud avec Supabase
+
+Pour laisser l'application ouverte a l'expert pendant un mois meme quand le laptop est ferme, utiliser un hebergement cloud pour Streamlit et une base Supabase PostgreSQL.
+
+Dans Supabase :
+
+1. Ouvrir le projet Supabase.
+2. Cliquer sur `Connect`.
+3. Si `Direct` affiche `Not IPv4 compatible`, choisir `Session Pooler` dans `Pooler settings`.
+4. Copier la `Connection string` au format URI, pas les variables `NEXT_PUBLIC_*`.
+5. Remplacer `[YOUR-PASSWORD]` par le mot de passe de la base Supabase.
+
+La valeur `Direct` ressemble a ceci, mais elle peut ne pas fonctionner sur un reseau IPv4 :
+
+```text
+postgresql://postgres:VOTRE_MOT_DE_PASSE@db.xxxxx.supabase.co:5432/postgres
+```
+
+Pour Streamlit Cloud, utiliser de preference la valeur `Session Pooler`, qui ressemble a ceci :
+
+```text
+postgresql://postgres.xxxxx:VOTRE_MOT_DE_PASSE@aws-0-eu-west-3.pooler.supabase.com:5432/postgres
+```
+
+Dans Streamlit Cloud, ajouter ces secrets :
+
+```toml
+OPTI_RECO_PASSWORD = "un-mot-de-passe-fort"
+DATABASE_URL = "postgresql://postgres.xxxxx:VOTRE_MOT_DE_PASSE@aws-0-eu-west-3.pooler.supabase.com:5432/postgres"
+```
+
+Ne pas utiliser les variables `NEXT_PUBLIC_*` : elles servent aux projets Next.js, pas a cette application Python/Streamlit.
+
+Au premier demarrage, l'application cree automatiquement les tables `corrections` et `recommendation_history` dans Supabase.
 
 ### Visualiser la base de donnees
 

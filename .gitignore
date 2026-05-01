@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# Secrets
+.env
+.streamlit/secrets.toml
+
+# Local databases and generated stores
+corrections.db
+corrections.db-*
+*.sqlite
+*.sqlite3
+chroma_db/
+chroma_db_taxonomy/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
