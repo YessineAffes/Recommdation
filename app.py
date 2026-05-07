@@ -619,6 +619,96 @@ def _parse_notes_json(text: str) -> list[dict[str, str]]:
         return []
 
 
+_CARD_HDR = (
+    "background-color:#E8541E;color:white;padding:6px 10px;"
+    "font-weight:bold;border-radius:4px;text-align:center;margin-bottom:6px;"
+)
+_CELL = "padding:6px 12px;text-align:center;border:1px solid #ddd;"
+_ROW_HDR = "background-color:#f5f5f5;font-weight:bold;padding:6px 12px;border:1px solid #ddd;"
+_TH = "background-color:#E8541E;color:white;padding:6px 12px;text-align:center;border:1px solid #ccc;"
+
+
+def _render_product_card_preview(payload: dict) -> None:
+    """Affiche la fiche produit sous forme de carte visuelle (style document imprime)."""
+    nom = payload.get("nom_produit", "")
+    concept = payload.get("concept", "")
+    perf = payload.get("plage_performance", {})
+    min_p = perf.get("min", 0)
+    max_p = perf.get("max", 0)
+    avantages = payload.get("avantages", [])
+    recommande_pour = payload.get("recommande_pour", "")
+    references = payload.get("references", [])
+    notes = payload.get("notes", [])
+
+    st.markdown("---")
+    st.markdown(
+        f'<div style="background-color:#E8541E;color:white;padding:10px 16px;border-radius:6px;'
+        f'font-size:1.1rem;font-weight:bold;margin-bottom:12px;">'
+        f'{nom} — Fiche produit</div>',
+        unsafe_allow_html=True,
+    )
+
+    # Section haute : 4 colonnes
+    c1, c2, c3, c4 = st.columns(4)
+    with c1:
+        st.markdown(f'<div style="{_CARD_HDR}">Nom produit</div>', unsafe_allow_html=True)
+        st.markdown(f"**{nom}**")
+        st.caption(concept)
+    with c2:
+        st.markdown(f'<div style="{_CARD_HDR}">Plage de performance</div>', unsafe_allow_html=True)
+        st.markdown(f"De **{min_p}** à **{max_p}**")
+        st.markdown(
+            f'<div style="font-family:monospace;font-size:0.85rem;color:#555;">'
+            f'{min_p} &nbsp;&nbsp;──── 0 ────&nbsp;&nbsp; {max_p}</div>',
+            unsafe_allow_html=True,
+        )
+    with c3:
+        st.markdown(f'<div style="{_CARD_HDR}">Avantages</div>', unsafe_allow_html=True)
+        for av in avantages:
+            st.markdown(f"✓ {av}")
+    with c4:
+        st.markdown(f'<div style="{_CARD_HDR}">À qui recommander ?</div>', unsafe_allow_html=True)
+        st.markdown(recommande_pour)
+
+    # Tableau des références
+    if references:
+        st.markdown("---")
+        col_headers = [r.get("nom", "") for r in references]
+        rows_data = [
+            ("Plage de stock", [str(r.get("plage_stock") or "") for r in references]),
+            ("Cyl 200", [str(r.get("cyl_200") or "") for r in references]),
+            ("Cyl 100", [str(r.get("cyl_100") or "") for r in references]),
+            ("Sphérique", [str(r.get("spherique") or "") for r in references]),
+        ]
+        html = f'<table style="width:100%;border-collapse:collapse;margin-top:4px;">'
+        html += f'<thead><tr><th style="{_TH}">{nom}</th>'
+        for h in col_headers:
+            html += f'<th style="{_TH}">{h}</th>'
+        html += "</tr></thead><tbody>"
+        for label, vals in rows_data:
+            html += f'<tr><td style="{_ROW_HDR}">{label}</td>'
+            for v in vals:
+                html += f'<td style="{_CELL}">{v}</td>'
+            html += "</tr>"
+        html += "</tbody></table>"
+        st.markdown(html, unsafe_allow_html=True)
+
+    # Boites NB (notes)
+    if notes:
+        st.markdown("---")
+        nb_cols = st.columns(max(len(notes), 1))
+        for col, note in zip(nb_cols, notes):
+            with col:
+                st.markdown(
+                    f'<div style="background-color:#E8541E;color:white;padding:10px 12px;'
+                    f'border-radius:6px;font-size:0.85rem;">'
+                    f'<strong>NB</strong><br><br>'
+                    f'<strong>{note.get("titre", "")}</strong><br>'
+                    f'{note.get("contenu", "")}</div>',
+                    unsafe_allow_html=True,
+                )
+
+
 def _render_product_form(store: CorrectionsStore) -> None:
     st.subheader("Ajouter un produit")
     st.caption("Cree une fiche produit JSON structuree, l'enregistre localement et l'indexe dans le RAG.")
@@ -718,8 +808,7 @@ def _render_product_form(store: CorrectionsStore) -> None:
             st.error(f"Produit cree, mais ingestion RAG echouee : {result.get('message')}")
 
     if st.session_state.product_last_payload:
-        st.markdown("**Derniere fiche produit generee**")
-        st.json(st.session_state.product_last_payload)
+        _render_product_card_preview(st.session_state.product_last_payload)
         if st.session_state.product_last_file:
             st.caption(f"Fichier local : {st.session_state.product_last_file}")
         st.download_button(
@@ -729,6 +818,8 @@ def _render_product_form(store: CorrectionsStore) -> None:
             mime="application/json",
             use_container_width=True,
         )
+        with st.expander("Voir le JSON brut", expanded=False):
+            st.json(st.session_state.product_last_payload)
         if st.session_state.product_last_result:
             st.json(st.session_state.product_last_result)
 
