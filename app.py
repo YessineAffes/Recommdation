@@ -713,13 +713,6 @@ def _render_product_form(store: CorrectionsStore) -> None:
     st.subheader("Ajouter un produit")
     st.caption("Cree une fiche produit JSON structuree, l'enregistre localement et l'indexe dans le RAG.")
 
-    empty_references_json = json.dumps([
-        {"nom": "", "plage_stock": "", "cyl_200": None, "cyl_100": None, "spherique": None},
-    ], indent=2, ensure_ascii=False)
-    empty_notes_json = json.dumps([
-        {"titre": "", "contenu": ""},
-    ], indent=2, ensure_ascii=False)
-
     with st.form("product_catalog_form"):
         left, right = st.columns([1, 1])
         with left:
@@ -727,7 +720,6 @@ def _render_product_form(store: CorrectionsStore) -> None:
             concept = st.text_input("Concept", value="")
             min_perf = st.number_input("Plage performance min", value=0, step=25)
             max_perf = st.number_input("Plage performance max", value=0, step=25)
-            collection_cible = st.selectbox("Collection RAG cible", rag_builder.COLLECTIONS, index=0)
         with right:
             avantages_text = st.text_area(
                 "Avantages (une ligne par avantage)",
@@ -740,45 +732,80 @@ def _render_product_form(store: CorrectionsStore) -> None:
                 height=140,
             )
 
-        references_text = st.text_area(
-            "References (JSON)",
-            value=empty_references_json,
-            height=160,
-            help='Liste JSON : [{"nom": "...", "plage_stock": "...", "cyl_200": 77, "cyl_100": 76, "spherique": 75}]',
-        )
-        notes_text = st.text_area(
-            "Notes (JSON)",
-            value=empty_notes_json,
-            height=130,
-            help='Liste JSON : [{"titre": "...", "contenu": "..."}]',
-        )
+        # --- Tableau Références ---
+        st.markdown("**Références**")
+        _rh = st.columns([3, 2, 1, 1, 1])
+        _rh[0].markdown("<small><b>Nom référence</b></small>", unsafe_allow_html=True)
+        _rh[1].markdown("<small><b>Plage stock</b></small>", unsafe_allow_html=True)
+        _rh[2].markdown("<small><b>Cyl 200</b></small>", unsafe_allow_html=True)
+        _rh[3].markdown("<small><b>Cyl 100</b></small>", unsafe_allow_html=True)
+        _rh[4].markdown("<small><b>Sphérique</b></small>", unsafe_allow_html=True)
+        _ref_inputs = []
+        for _i in range(5):
+            _rc = st.columns([3, 2, 1, 1, 1])
+            _ref_inputs.append((
+                _rc[0].text_input("nom", key=f"ref_nom_{_i}", label_visibility="collapsed"),
+                _rc[1].text_input("plage", key=f"ref_plage_{_i}", label_visibility="collapsed"),
+                _rc[2].text_input("c200", key=f"ref_c200_{_i}", label_visibility="collapsed"),
+                _rc[3].text_input("c100", key=f"ref_c100_{_i}", label_visibility="collapsed"),
+                _rc[4].text_input("sph", key=f"ref_sph_{_i}", label_visibility="collapsed"),
+            ))
+
+        # --- Tableau Notes ---
+        st.markdown("**Notes**")
+        _nh = st.columns([2, 5])
+        _nh[0].markdown("<small><b>Titre</b></small>", unsafe_allow_html=True)
+        _nh[1].markdown("<small><b>Contenu</b></small>", unsafe_allow_html=True)
+        _note_inputs = []
+        for _i in range(4):
+            _nc = st.columns([2, 5])
+            _note_inputs.append((
+                _nc[0].text_input("titre", key=f"note_titre_{_i}", label_visibility="collapsed"),
+                _nc[1].text_input("contenu", key=f"note_contenu_{_i}", label_visibility="collapsed"),
+            ))
+
         submitted = st.form_submit_button("Creer et indexer le produit", use_container_width=True)
+
+    _default_collection = rag_builder.COLLECTIONS[0] if rag_builder.COLLECTIONS else "types_verres"
 
     if submitted:
         if not nom_produit.strip():
             st.error("Le nom du produit est obligatoire.")
             return
+        references_list = [
+            {
+                "nom": _n, "plage_stock": _p,
+                "cyl_200": _clean_int(_c2) if _c2.strip() else None,
+                "cyl_100": _clean_int(_c1) if _c1.strip() else None,
+                "spherique": _clean_int(_s) if _s.strip() else None,
+            }
+            for _n, _p, _c2, _c1, _s in _ref_inputs if _n.strip()
+        ]
+        notes_list = [
+            {"titre": _t, "contenu": _c}
+            for _t, _c in _note_inputs if _t.strip() or _c.strip()
+        ]
         payload = {
             "nom_produit": nom_produit.strip(),
             "concept": concept.strip(),
             "plage_performance": {"min": int(min_perf), "max": int(max_perf)},
             "avantages": _lines(avantages_text),
             "recommande_pour": recommande_pour.strip(),
-            "references": _parse_references_json(references_text),
-            "notes": _parse_notes_json(notes_text),
+            "references": references_list,
+            "notes": notes_list,
         }
         PRODUCT_DOCS_PATH.mkdir(parents=True, exist_ok=True)
         filename = f"product_{_slug(nom_produit)}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
         filepath = PRODUCT_DOCS_PATH / filename
         json_payload = json.dumps(payload, indent=2, ensure_ascii=False)
         filepath.write_text(json_payload, encoding="utf-8")
-        result = ingest_product_payload(payload, source_name=filename, collection_cible=collection_cible)
+        result = ingest_product_payload(payload, source_name=filename, collection_cible=_default_collection)
 
         product_id: int | None = None
         try:
             product_id = store.add_product_card(
                 payload=payload,
-                collection_cible=collection_cible,
+                collection_cible=_default_collection,
                 expert_name=st.session_state.expert_name,
                 source_file=filename,
                 rag_result=result,
