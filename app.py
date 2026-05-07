@@ -832,7 +832,13 @@ def main() -> None:
 
     database_url = _database_url()
     rules_token = _rules_cache_token()
-    store = _get_store(database_url)
+    try:
+        store = _get_store(database_url)
+    except Exception:
+        st.error("Connexion base impossible. Verifie DATABASE_URL (Session Pooler Supabase), le mot de passe, puis redemarre l'app.")
+        st.code("Exemple: postgresql://postgres.<project_ref>:<password>@aws-1-eu-central-1.pooler.supabase.com:5432/postgres?sslmode=require")
+        st.stop()
+
     engine = _get_engine(rules_token, database_url or "sqlite", store)
     rules = _load_rules(rules_token)
     flow = _question_flow(rules)

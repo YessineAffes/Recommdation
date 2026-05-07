@@ -7,6 +7,7 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from urllib.parse import parse_qsl, quote, unquote, urlencode, urlsplit, urlunsplit
 
 from sqlalchemy import (
     CheckConstraint,
@@ -120,11 +121,38 @@ def _json_dumps(value: Any) -> str:
 
 
 def _normalize_database_url(url: str) -> str:
-    if url.startswith("postgresql://"):
-        return "postgresql+psycopg://" + url.removeprefix("postgresql://")
-    if url.startswith("postgres://"):
-        return "postgresql+psycopg://" + url.removeprefix("postgres://")
-    return url
+    normalized = str(url or "").strip()
+    if normalized.startswith("postgres://"):
+        normalized = "postgresql://" + normalized.removeprefix("postgres://")
+    if normalized.startswith("postgresql://"):
+        normalized = "postgresql+psycopg://" + normalized.removeprefix("postgresql://")
+    if not normalized.startswith("postgresql+psycopg://"):
+        return normalized
+
+    parts = urlsplit(normalized)
+    host = parts.hostname or ""
+    if ":" in host and not host.startswith("["):
+        host = f"[{host}]"
+
+    username = quote(unquote(parts.username or ""), safe="") if parts.username else ""
+    password = quote(unquote(parts.password or ""), safe="") if parts.password is not None else None
+
+    auth = ""
+    if username:
+        auth = username
+        if password is not None:
+            auth += f":{password}"
+        auth += "@"
+
+    port = f":{parts.port}" if parts.port else ""
+    netloc = f"{auth}{host}{port}"
+
+    query_pairs = dict(parse_qsl(parts.query, keep_blank_values=True))
+    if "supabase.com" in (parts.hostname or "") and "sslmode" not in query_pairs:
+        query_pairs["sslmode"] = "require"
+    query = urlencode(query_pairs)
+
+    return urlunsplit((parts.scheme, netloc, parts.path, query, parts.fragment))
 
 
 def _sqlite_url(path: Path) -> str:

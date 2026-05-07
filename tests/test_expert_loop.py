@@ -6,7 +6,13 @@ from pathlib import Path
 
 import pytest
 
-from core.corrections_store import HISTORY_CORRECTED, HISTORY_PENDING, HISTORY_VALIDATED, CorrectionsStore
+from core.corrections_store import (
+    HISTORY_CORRECTED,
+    HISTORY_PENDING,
+    HISTORY_VALIDATED,
+    CorrectionsStore,
+    _normalize_database_url,
+)
 from core.decision_engine import DecisionEngine
 
 
@@ -235,3 +241,20 @@ def test_product_card_is_persisted_in_store(tmp_store):
     rows = tmp_store.list_product_cards(limit=5)
     assert rows
     assert rows[0]["id"] == record_id
+
+
+def test_normalize_database_url_adds_driver_and_sslmode_for_supabase():
+    raw = "postgresql://postgres.proj:pwd@aws-1-eu-central-1.pooler.supabase.com:5432/postgres"
+    normalized = _normalize_database_url(raw)
+
+    assert normalized.startswith("postgresql+psycopg://")
+    assert "sslmode=require" in normalized
+
+
+def test_normalize_database_url_encodes_special_password_characters():
+    raw = "postgresql://postgres.proj:ab:cd@aws-1-eu-central-1.pooler.supabase.com:5432/postgres?sslmode=require"
+    normalized = _normalize_database_url(raw)
+
+    assert normalized.startswith("postgresql+psycopg://")
+    assert "ab%3Acd" in normalized
+    assert "sslmode=require" in normalized
