@@ -333,8 +333,17 @@ def _inject_css() -> None:
         label, p, span {{ letter-spacing:0; }}
         @keyframes fadeIn {{ from {{ opacity:0; transform:translateY(8px); }} to {{ opacity:1; transform:translateY(0); }} }}
         @keyframes pulseIn {{ 0% {{ opacity:0; transform:scale(.98); }} 100% {{ opacity:1; transform:scale(1); }} }}
+        .ao {{ transform-box:fill-box; transform-origin:center; animation:logoPop 0.75s cubic-bezier(0.34,1.56,0.64,1) 0.3s both; }}
+        .ad {{ stroke-dasharray:42; stroke-dashoffset:42; animation:logoDraw 0.4s ease 1.05s forwards; }}
+        .ap {{ transform-box:fill-box; transform-origin:center; animation:logoPop 0.75s cubic-bezier(0.34,1.56,0.64,1) 1.45s both; }}
+        .aw {{ animation:logoWrite 1.15s ease 2.2s both; }}
+        .as {{ animation:logoFade 0.6s ease 3.4s both; }}
+        @keyframes logoPop  {{ 0%{{transform:scale(0);opacity:0}} 65%{{transform:scale(1.13)}} 100%{{transform:scale(1);opacity:1}} }}
+        @keyframes logoDraw {{ to{{stroke-dashoffset:0}} }}
+        @keyframes logoWrite{{ from{{clip-path:inset(0 100% 0 0)}} to{{clip-path:inset(0 0% 0 0)}} }}
+        @keyframes logoFade {{ from{{opacity:0;transform:translateY(7px)}} to{{opacity:1;transform:translateY(0)}} }}
         @media (max-width: 1100px) {{ .step {{ grid-template-columns:2.15rem minmax(0,1fr); font-size:.82rem; }} .step-id {{ min-width:2rem; }} }}
-        @media (max-width: 900px) {{ .progress-panel {{ max-height:none; }} .preview-panel {{ position:static; }} .opti-header {{ align-items:center; }} .brand-wrap {{ min-height:auto; }} .header-side {{ margin-left:0; }} .brand-logo {{ width:220px; }} .result-grid {{ grid-template-columns:1fr; }} }}
+        @media (max-width: 900px) {{ .progress-panel {{ max-height:none; }} .preview-panel {{ position:static; }} .opti-header {{ align-items:center; }} .brand-wrap {{ min-height:auto; }} .header-side {{ margin-left:0; }} .result-grid {{ grid-template-columns:1fr; }} }}
         </style>
         """,
         unsafe_allow_html=True,
@@ -352,10 +361,38 @@ def _image_data_uri(path_str: str) -> str:
     return f"data:{mime};base64,{encoded}"
 
 
+_LOGO_SVG = """
+<svg id="optiflow-anim" viewBox="0 0 575 160" width="320" style="overflow:visible;display:block;">
+  <defs>
+    <linearGradient id="og" x1="0" y1="0" x2="575" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0%"   stop-color="#0f1fc4"/>
+      <stop offset="42%"  stop-color="#0055e0"/>
+      <stop offset="100%" stop-color="#00d4ff"/>
+    </linearGradient>
+    <linearGradient id="ogs" x1="0" y1="0" x2="575" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0%"   stop-color="#1a2d7a"/>
+      <stop offset="100%" stop-color="#1e4a8a"/>
+    </linearGradient>
+  </defs>
+  <g class="ao">
+    <circle cx="62" cy="70" r="46" fill="none" stroke="url(#og)" stroke-width="13"/>
+    <circle cx="62" cy="26" r="7" fill="url(#og)"/>
+  </g>
+  <line class="ad" x1="112" y1="70" x2="152" y2="70" stroke="url(#og)" stroke-width="13" stroke-linecap="round"/>
+  <g class="ap">
+    <circle cx="200" cy="70" r="46" fill="none" stroke="url(#og)" stroke-width="13"/>
+    <line x1="156" y1="70" x2="156" y2="148" stroke="url(#og)" stroke-width="13" stroke-linecap="round"/>
+  </g>
+  <g class="aw">
+    <text x="254" y="112" font-family="'Trebuchet MS','Arial Rounded MT Bold',Arial,sans-serif" font-size="88" font-weight="900" fill="url(#og)">tiflow</text>
+  </g>
+  <text class="as" x="292" y="143" font-family="sans-serif" font-size="17" fill="url(#ogs)" letter-spacing="1">EssilorLuxottica</text>
+</svg>
+"""
+
+
 def _render_header() -> None:
-    logo_uri = _image_data_uri(str(LOGO_PATH))
-    logo_html = f'<img class="brand-logo" src="{logo_uri}" alt="Optiflow" />' if logo_uri else ""
-    header_left = f'<div class="brand-wrap">{logo_html}</div>'
+    header_left = f'<div class="brand-wrap">{_LOGO_SVG}</div>'
     header_right = '<div class="header-side"><div class="client-pill">Version Expert</div></div>'
     st.markdown(f'<div class="opti-header">{header_left}{header_right}</div>', unsafe_allow_html=True)
 
