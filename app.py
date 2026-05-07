@@ -143,17 +143,7 @@ def _require_login() -> None:
     if st.session_state.authenticated:
         return
 
-    st.markdown(
-        """
-        <div class="opti-header">
-            <div>
-                <div class="brand">OptiReco Pro</div>
-                <div style="color:#64748B;font-weight:600;">Acces expert protege</div>
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    _render_header()
     with st.form("login_form"):
         expert_name = st.text_input("Nom expert", st.session_state.expert_name)
         password = st.text_input("Mot de passe", type="password")
@@ -287,9 +277,11 @@ def _inject_css() -> None:
             padding:1rem 1.2rem; border:1px solid #CFE4F7;
             background: linear-gradient(135deg, #FFFFFF, #EAF6FF);
             border-radius:18px; box-shadow:0 14px 36px rgba(15, 23, 42, .08); margin-bottom:1rem;
+            flex-wrap:wrap;
         }}
-        .brand-wrap {{ display:flex; align-items:center; gap:1rem; }}
+        .brand-wrap {{ display:flex; align-items:center; gap:1rem; min-height:92px; }}
         .brand-logo {{ width:260px; max-width:100%; height:auto; display:block; }}
+        .header-side {{ margin-left:auto; display:flex; align-items:center; }}
         .client-pill {{ border:1px solid #CFE4F7; background:#FFFFFF; border-radius:999px; padding:.55rem .95rem; color:{PALETTE['white']}; font-weight:800; white-space:nowrap; }}
         .panel {{
             border:1px solid #D8E6F5; background:{PALETTE['panel']};
@@ -342,7 +334,7 @@ def _inject_css() -> None:
         @keyframes fadeIn {{ from {{ opacity:0; transform:translateY(8px); }} to {{ opacity:1; transform:translateY(0); }} }}
         @keyframes pulseIn {{ 0% {{ opacity:0; transform:scale(.98); }} 100% {{ opacity:1; transform:scale(1); }} }}
         @media (max-width: 1100px) {{ .step {{ grid-template-columns:2.15rem minmax(0,1fr); font-size:.82rem; }} .step-id {{ min-width:2rem; }} }}
-        @media (max-width: 900px) {{ .progress-panel {{ max-height:none; }} .preview-panel {{ position:static; }} .opti-header {{ flex-direction:column; align-items:flex-start; }} .brand-wrap {{ flex-direction:column; align-items:flex-start; }} .brand-logo {{ width:150px; }} .result-grid {{ grid-template-columns:1fr; }} }}
+        @media (max-width: 900px) {{ .progress-panel {{ max-height:none; }} .preview-panel {{ position:static; }} .opti-header {{ align-items:center; }} .brand-wrap {{ min-height:auto; }} .header-side {{ margin-left:0; }} .brand-logo {{ width:220px; }} .result-grid {{ grid-template-columns:1fr; }} }}
         </style>
         """,
         unsafe_allow_html=True,
@@ -358,6 +350,14 @@ def _image_data_uri(path_str: str) -> str:
     suffix = path.suffix.lower()
     mime = "image/png" if suffix == ".png" else "image/jpeg"
     return f"data:{mime};base64,{encoded}"
+
+
+def _render_header() -> None:
+    logo_uri = _image_data_uri(str(LOGO_PATH))
+    logo_html = f'<img class="brand-logo" src="{logo_uri}" alt="Optiflow" />' if logo_uri else ""
+    header_left = f'<div class="brand-wrap">{logo_html}</div>'
+    header_right = '<div class="header-side"><div class="client-pill">Version Expert</div></div>'
+    st.markdown(f'<div class="opti-header">{header_left}{header_right}</div>', unsafe_allow_html=True)
 
 
 def _render_progress(flow: list[dict[str, Any]], state: dict[str, Any], current: int, rules: dict[str, Any]) -> tuple[int, int]:
@@ -963,11 +963,7 @@ def main() -> None:
     state = st.session_state.consultation_state
     current = int(st.session_state.current_action)
 
-    logo_uri = _image_data_uri(str(LOGO_PATH))
-    logo_html = f'<img class="brand-logo" src="{logo_uri}" alt="Optiflow" />' if logo_uri else ""
-    header_left = f'<div class="brand-wrap">{logo_html}</div>'
-    header_right = '<div class="client-pill">Version Expert</div>'
-    st.markdown(f'<div class="opti-header"><div>{header_left}</div><div>{header_right}</div></div>', unsafe_allow_html=True)
+    _render_header()
 
     tab_new, tab_product, tab_history = st.tabs(["Nouvelle recommandation", "Ajouter un produit", "Historique"])
 
