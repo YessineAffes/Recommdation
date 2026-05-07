@@ -31,6 +31,7 @@ class FormulationLayer:
         recommendation: dict[str, Any],
         rag_chunks: list[str],
         state: dict[str, Any],
+        temperature: float = 0.2,
     ) -> str:
         """
         Retourne TOUJOURS une string.
@@ -56,7 +57,7 @@ class FormulationLayer:
             text = self.client.complete(
                 system=system,
                 user=user,
-                temperature=0.2,
+                temperature=temperature,
                 max_tokens=320,
             )
             text = (text or "").strip()

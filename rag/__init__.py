@@ -1,3 +1,3 @@
-from .rag_builder import ingest_folder, get_justification
+from .rag_builder import get_context, get_justification, ingest_folder
 
-__all__ = ["ingest_folder", "get_justification"]
+__all__ = ["ingest_folder", "get_justification", "get_context"]

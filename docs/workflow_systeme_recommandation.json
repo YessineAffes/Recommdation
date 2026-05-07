@@ -1,0 +1,484 @@
+{
+  "document_type": "workflow_systeme_recommandation",
+  "version": "1.0",
+  "language": "fr",
+  "created_at": "2026-05-03",
+  "project": {
+    "name": "OptiReco Pro",
+    "domain": "Recommandation de verres optiques",
+    "main_app": "app.py",
+    "main_goal": "Aider un expert optique a recommander un type de verre, un indice, un design, un traitement et une couleur a partir d'un questionnaire client."
+  },
+  "core_principle": {
+    "summary": "La decision finale est deterministe et basee sur des regles metier. Le RAG et le LLM servent a expliquer, enrichir ou interpreter, mais ne doivent pas modifier la recommandation finale.",
+    "decision_owner": "core/decision_engine.py",
+    "rules_owner": "core/dynamic_rules.json",
+    "rag_role": "Recuperer des extraits documentaires utiles pour justifier la recommandation.",
+    "llm_role": "Comprendre des reponses libres ou formuler une justification en langage naturel, sans changer la decision."
+  },
+  "high_level_flow": [
+    "L'expert ouvre l'application Streamlit.",
+    "L'expert se connecte avec un mot de passe.",
+    "Le client repond au questionnaire dynamique.",
+    "Les reponses sont stockees dans un objet state.",
+    "Le moteur DecisionEngine applique les regles metier.",
+    "Le systeme produit une recommandation finale.",
+    "Le RAG cherche des extraits documentaires correspondant au resultat.",
+    "L'interface affiche la recommandation, la trace de decision et les extraits RAG.",
+    "L'expert valide ou corrige le resultat.",
+    "L'historique est sauvegarde dans la base locale ou distante."
+  ],
+  "source_files": {
+    "interface_streamlit": "app.py",
+    "decision_engine": "core/decision_engine.py",
+    "dynamic_rules": "core/dynamic_rules.json",
+    "navigation_and_skip_logic": "core/state_machine.py",
+    "history_and_expert_corrections": "core/corrections_store.py",
+    "rag_builder": "rag/rag_builder.py",
+    "rag_watcher": "rag/rag_watcher.py",
+    "product_schema": "rag/product_schema.json",
+    "llm_client": "llm/llm_client.py",
+    "llm_nlu": "llm/nlu.py",
+    "llm_formulation": "llm/formulation.py"
+  },
+  "data_objects": {
+    "state": {
+      "description": "Dictionnaire contenant toutes les reponses structurees du questionnaire.",
+      "example": {
+        "Q1_age": 45,
+        "Q2_montage": "perce",
+        "Q3_correction_total": "425-600",
+        "Q3_add": 2.25,
+        "Q3_diff_od_og": "<=200",
+        "Q4_usage_ordinateur": "tres_souvent",
+        "Q5_besoin_principal": "lumiere_bleue",
+        "Q6_sante_oculaire": "ras",
+        "Q13_paire_soleil": "non",
+        "Q7_gene_lumiere": "moyenne",
+        "Q22_style_vie_actif": true
+      }
+    },
+    "recommendation": {
+      "description": "Objet final retourne par le moteur de decision.",
+      "fields": [
+        "type_verre",
+        "indice",
+        "design_varilux",
+        "traitement",
+        "couleur",
+        "corridor_type",
+        "extras",
+        "trace"
+      ],
+      "example": {
+        "type_verre": "Varilux S Design",
+        "indice": "1.60",
+        "design_varilux": "Varilux S Design",
+        "traitement": "Crizal Prevencia",
+        "couleur": "Transitions Gen S",
+        "corridor_type": "Regular",
+        "extras": [],
+        "trace": [
+          "P1 type_verre=Varilux (age=45)",
+          "Indice 1.60: Correction elevee",
+          "P2 indice=1.60: Montage perce: indice 1.60 minimum absolu",
+          "P4 design=Varilux S Design: ADD >= 2.25",
+          "Traitement Crizal Prevencia: Protection lumiere bleue",
+          "Couleur Transitions Gen S: Gene lumineuse"
+        ]
+      }
+    }
+  },
+  "workflow_steps": [
+    {
+      "id": 1,
+      "name": "Demarrage de l'application",
+      "component": "app.py",
+      "input": "Commande streamlit run app.py",
+      "output": "Interface web OptiReco Pro",
+      "details": [
+        "Streamlit charge la page principale.",
+        "L'application initialise la session utilisateur.",
+        "L'application charge les regles, le moteur et la base d'historique."
+      ]
+    },
+    {
+      "id": 2,
+      "name": "Authentification expert",
+      "component": "app.py",
+      "input": "Nom expert et mot de passe",
+      "output": "Acces a l'interface de recommandation",
+      "details": [
+        "Le mot de passe vient de OPTI_RECO_PASSWORD, de st.secrets ou de la valeur par defaut expert123.",
+        "Si le mot de passe est correct, l'expert peut utiliser le questionnaire."
+      ]
+    },
+    {
+      "id": 3,
+      "name": "Chargement des regles dynamiques",
+      "component": "core/dynamic_rules.json",
+      "input": "Fichier JSON de regles",
+      "output": "Liste de questions, regles de skip, regles de navigation et regles metier",
+      "details": [
+        "Les 22 questions sont definies dans dynamic_rules.json.",
+        "Les regles de navigation decident quelle question vient ensuite.",
+        "Les regles de skip permettent de ne pas poser des questions inutiles."
+      ]
+    },
+    {
+      "id": 4,
+      "name": "Questionnaire dynamique",
+      "component": "app.py et core/state_machine.py",
+      "input": "Reponses de l'expert ou du client",
+      "output": "Objet state mis a jour",
+      "details": [
+        "Chaque question ajoute une valeur dans st.session_state.consultation_state.",
+        "La fonction get_next_action choisit la prochaine question.",
+        "Certaines questions sont sautees selon l'age, l'usage ordinateur, le soleil ou d'autres conditions."
+      ]
+    },
+    {
+      "id": 5,
+      "name": "Apercu live",
+      "component": "app.py et core/decision_engine.py",
+      "input": "State partiel",
+      "output": "Recommandation provisoire si possible",
+      "details": [
+        "L'application essaie de calculer une recommandation pendant le questionnaire.",
+        "Si les donnees obligatoires ne sont pas encore presentes, aucun resultat complet n'est affiche."
+      ]
+    },
+    {
+      "id": 6,
+      "name": "Decision finale",
+      "component": "core/decision_engine.py",
+      "input": "State complet",
+      "output": "Objet Recommendation",
+      "details": [
+        "Le moteur applique d'abord les regles prioritaires.",
+        "Le type de verre est determine par l'age.",
+        "L'indice est determine par la correction et le montage.",
+        "Le design Varilux est choisi selon les usages et contraintes client.",
+        "Le traitement est choisi selon les besoins, la sante et le style de vie.",
+        "La couleur est choisie selon le soleil, les reflets, la gene lumineuse et l'environnement."
+      ]
+    },
+    {
+      "id": 7,
+      "name": "Trace explicative",
+      "component": "core/decision_engine.py",
+      "input": "Regles appliquees pendant la decision",
+      "output": "Liste trace dans Recommendation",
+      "details": [
+        "Chaque regle importante ajoute une ligne dans trace.",
+        "La trace permet de comprendre pourquoi le moteur a donne ce resultat.",
+        "Cette trace est affichee dans la section Pourquoi cette recommandation."
+      ]
+    },
+    {
+      "id": 8,
+      "name": "Recherche RAG",
+      "component": "rag/rag_builder.py",
+      "input": "Recommendation finale",
+      "output": "Extraits documentaires pertinents",
+      "details": [
+        "Le RAG cherche dans ChromaDB selon le type de verre, l'indice, le traitement et la couleur.",
+        "Les collections utilisees sont types_verres, indices, traitements et couleurs.",
+        "Les extraits RAG servent a justifier le resultat, pas a le changer."
+      ]
+    },
+    {
+      "id": 9,
+      "name": "Formulation LLM optionnelle",
+      "component": "llm/formulation.py",
+      "input": "Recommendation figee, state et extraits RAG",
+      "output": "Justification en francais naturel",
+      "details": [
+        "Le prompt interdit au LLM de modifier le resultat.",
+        "Le LLM peut seulement expliquer la recommandation deja decidee.",
+        "Si le LLM echoue, un texte fallback statique peut etre utilise."
+      ]
+    },
+    {
+      "id": 10,
+      "name": "Validation expert",
+      "component": "app.py et core/corrections_store.py",
+      "input": "Recommendation automatique",
+      "output": "Historique en attente, valide ou corrige",
+      "details": [
+        "Chaque recommandation finale est sauvegardee dans recommendation_history.",
+        "L'expert peut valider sans correction.",
+        "L'expert peut aussi corriger le type, l'indice, le traitement ou la couleur.",
+        "Les corrections peuvent servir d'override expert pour des cas proches."
+      ]
+    }
+  ],
+  "decision_engine": {
+    "main_method": "DecisionEngine.decide(state)",
+    "input": "state",
+    "output": "Recommendation",
+    "protected_business_rules": [
+      "Le type_verre est determine par l'age et ne doit pas etre ecrase par une regle dynamique simple.",
+      "Un montage perce impose un indice minimum de 1.60.",
+      "La hierarchie Varilux conserve le design le plus haut atteint.",
+      "La hierarchie Crizal evite qu'un traitement moins prioritaire ecrase un traitement plus important.",
+      "Le RAG ne decide jamais."
+    ],
+    "type_verre_logic": [
+      {
+        "condition": "age <= 30",
+        "result": "Simple foyer"
+      },
+      {
+        "condition": "31 <= age <= 41",
+        "result": "Eyezen"
+      },
+      {
+        "condition": "age >= 42",
+        "result": "Varilux"
+      }
+    ],
+    "indice_logic": [
+      {
+        "condition": "correction < 200",
+        "result": "1.50"
+      },
+      {
+        "condition": "correction 225-400",
+        "result": "1.56"
+      },
+      {
+        "condition": "correction 425-600",
+        "result": "1.60"
+      },
+      {
+        "condition": "correction > 625",
+        "result": "1.67"
+      },
+      {
+        "condition": "correction > 800",
+        "result": "1.74"
+      },
+      {
+        "condition": "montage perce",
+        "result": "indice minimum 1.60"
+      }
+    ],
+    "varilux_hierarchy": [
+      "Varilux Liberty 3.0",
+      "Varilux Comfort 3.0",
+      "Varilux Comfort Max",
+      "Varilux Physio 3.0",
+      "Varilux S Design",
+      "Varilux X Design",
+      "Varilux XR"
+    ],
+    "crizal_hierarchy": [
+      "Crizal Easy Pro",
+      "Crizal Rock",
+      "Crizal Sapphire HR",
+      "Crizal Prevencia",
+      "Crizal Drive"
+    ],
+    "traitement_examples": [
+      {
+        "condition": "besoin transparence",
+        "result": "Crizal Sapphire HR"
+      },
+      {
+        "condition": "lumiere bleue",
+        "result": "Crizal Prevencia"
+      },
+      {
+        "condition": "conduite de nuit",
+        "result": "Crizal Drive"
+      },
+      {
+        "condition": "resistance rayures ou style actif",
+        "result": "Crizal Rock"
+      },
+      {
+        "condition": "pathologie oculaire ou antecedents",
+        "result": "Crizal Prevencia"
+      }
+    ],
+    "couleur_examples": [
+      {
+        "condition": "paire soleil tres exposee ou reflets forts",
+        "result": "Transitions X Polarized"
+      },
+      {
+        "condition": "usage soleil simple",
+        "result": "Solaire"
+      },
+      {
+        "condition": "gene lumineuse moyenne, forte ou tres forte",
+        "result": "Transitions Gen S"
+      },
+      {
+        "condition": "conduite plus exposition exterieure",
+        "result": "Transitions XTRActive"
+      },
+      {
+        "condition": "aucune contrainte lumiere",
+        "result": "Blanc"
+      }
+    ]
+  },
+  "rag": {
+    "meaning": "Retrieval Augmented Generation",
+    "implementation_file": "rag/rag_builder.py",
+    "database": "ChromaDB persistante",
+    "database_folder": "chroma_db_taxonomy",
+    "document_folder": "rag/documents",
+    "collections": [
+      "types_verres",
+      "indices",
+      "traitements",
+      "couleurs"
+    ],
+    "ingestion_sources": [
+      "Fichiers docx dans rag/documents",
+      "Fichiers JSON produit generes par l'admin",
+      "Formulaire Nouveau Produit dans admin/tabs/product_form.py"
+    ],
+    "query_strategy": [
+      "Chercher le type de verre dans la collection types_verres.",
+      "Chercher l'indice dans la collection indices.",
+      "Chercher le traitement dans la collection traitements.",
+      "Chercher la couleur dans la collection couleurs."
+    ],
+    "important_limit": "Le RAG ne modifie pas type_verre, indice, traitement, couleur ou design. Il fournit seulement des extraits pour l'explication."
+  },
+  "llm": {
+    "provider_file": "llm/llm_client.py",
+    "supported_providers": [
+      "anthropic",
+      "ollama",
+      "openai_compat"
+    ],
+    "environment_variables": [
+      "LLM_PROVIDER",
+      "LLM_NLU_MODEL",
+      "LLM_FORMAT_MODEL",
+      "ANTHROPIC_API_KEY",
+      "OLLAMA_BASE_URL",
+      "OPENAI_BASE_URL",
+      "OPENAI_API_KEY"
+    ],
+    "nlu_layer": {
+      "file": "llm/nlu.py",
+      "role": "Convertir une reponse libre en valeur structuree.",
+      "example": {
+        "raw_answer": "il travaille toute la journee sur ordinateur",
+        "structured_value": {
+          "question_id": "Q4_usage_ordinateur",
+          "value": "tres_souvent",
+          "confidence": 0.85
+        }
+      },
+      "note": "Dans l'interface Streamlit actuelle, les widgets donnent deja des valeurs structurees. La NLU est donc surtout utile pour un mode chat ou saisie libre."
+    },
+    "formulation_layer": {
+      "file": "llm/formulation.py",
+      "role": "Rediger une justification claire a partir de la recommandation figee et des extraits RAG.",
+      "hard_rule": "Le LLM ne doit jamais changer le resultat decide par DecisionEngine."
+    }
+  },
+  "expert_feedback_loop": {
+    "storage_file": "core/corrections_store.py",
+    "local_database_default": "corrections.db",
+    "cloud_database_option": "DATABASE_URL avec PostgreSQL ou Supabase",
+    "history_table": "recommendation_history",
+    "corrections_table": "corrections",
+    "statuses": [
+      "pending",
+      "corrected",
+      "validated"
+    ],
+    "workflow": [
+      "Le moteur genere une recommandation automatique.",
+      "L'application cree une ligne d'historique en statut pending.",
+      "L'expert valide ou corrige.",
+      "Si l'expert corrige, le resultat expert est sauvegarde.",
+      "Une correction expert peut etre reutilisee comme override pour un cas proche."
+    ]
+  },
+  "complete_example": {
+    "input_state": {
+      "Q1_age": 45,
+      "Q2_montage": "perce",
+      "Q3_correction_total": "425-600",
+      "Q3_add": 2.25,
+      "Q3_diff_od_og": "<=200",
+      "Q4_vision_laterale": "mixte",
+      "Q4_conduite_nuit": true,
+      "Q4_usage_ordinateur": "tres_souvent",
+      "Q7_type_ordinateur": "bureau",
+      "Q4_adaptation_facile": true,
+      "Q4_innovation": false,
+      "Q5_besoin_principal": "lumiere_bleue",
+      "Q6_sante_oculaire": "ras",
+      "Q13_paire_soleil": "non",
+      "Q7_gene_lumiere": "moyenne",
+      "Q7_environnement": "mixte",
+      "Q18_preference_verre": "plus_legers",
+      "Q19_antecedents_familiaux": false,
+      "Q20_operation_yeux": false,
+      "Q21_fatigue_oculaire": true,
+      "Q22_style_vie_actif": true
+    },
+    "expected_reasoning": [
+      "Age 45 implique une famille Varilux.",
+      "Montage perce impose un indice minimum 1.60.",
+      "Correction 425-600 donne aussi un indice 1.60.",
+      "ADD 2.25 peut orienter vers Varilux S Design.",
+      "Usage ordinateur tres frequent peut proposer un design oriente confort digital.",
+      "Adaptation facile peut proposer un design plus premium selon la hierarchie.",
+      "Besoin lumiere bleue et fatigue oculaire orientent vers Crizal Prevencia.",
+      "Gene lumineuse moyenne et environnement mixte orientent vers Transitions Gen S.",
+      "Le RAG cherche ensuite des extraits sur les produits retenus."
+    ],
+    "possible_output": {
+      "type_verre": "Varilux X Design",
+      "indice": "1.60",
+      "design_varilux": "Varilux X Design",
+      "traitement": "Crizal Prevencia",
+      "couleur": "Transitions Gen S",
+      "corridor_type": "Regular",
+      "extras": [
+        "Alternative: Varilux Digitime Near/Mid/Room",
+        "Style actif: Crizal Rock"
+      ]
+    }
+  },
+  "reuse_for_other_cases": {
+    "goal": "Adapter la meme architecture a un autre domaine de recommandation.",
+    "steps": [
+      "Remplacer les questions dans dynamic_rules.json par les questions du nouveau domaine.",
+      "Remplacer les regles metier par les criteres de decision du nouveau domaine.",
+      "Adapter la classe Recommendation aux champs de sortie attendus.",
+      "Creer des collections RAG correspondant aux categories du nouveau domaine.",
+      "Indexer des documents fiables dans rag/documents.",
+      "Garder le LLM dans un role explicatif ou NLU, pas comme moteur de decision sensible.",
+      "Conserver l'historique expert pour ameliorer les cas futurs."
+    ],
+    "generic_pattern": {
+      "input": "Questionnaire structure ou reponses libres parsees",
+      "decision": "Moteur de regles deterministe",
+      "retrieval": "RAG pour documents de reference",
+      "language": "LLM pour reformuler ou expliquer",
+      "feedback": "Validation ou correction expert",
+      "storage": "Historique et corrections"
+    }
+  },
+  "quick_summary": [
+    "Le questionnaire construit un state.",
+    "DecisionEngine lit ce state et applique dynamic_rules.json.",
+    "Le resultat est une Recommendation.",
+    "Le RAG cherche des extraits sur les produits recommandes.",
+    "Le LLM peut aider a comprendre ou expliquer, mais il ne decide pas.",
+    "L'expert valide ou corrige.",
+    "L'historique rend le systeme auditable et reutilisable."
+  ]
+}

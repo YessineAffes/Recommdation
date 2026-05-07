@@ -16,6 +16,7 @@ corrections.db-*
 *.sqlite3
 chroma_db/
 chroma_db_taxonomy/
+agent_trace.log
 
 # OS / editor
 .DS_Store
