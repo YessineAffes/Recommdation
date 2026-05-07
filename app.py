@@ -289,9 +289,8 @@ def _inject_css() -> None:
             border-radius:18px; box-shadow:0 14px 36px rgba(15, 23, 42, .08); margin-bottom:1rem;
         }}
         .brand-wrap {{ display:flex; align-items:center; gap:1rem; }}
-        .brand-logo {{ width:180px; max-width:100%; height:auto; display:block; }}
-        .brand {{ font-size:1.35rem; font-weight:800; color:#075985; letter-spacing:0; }}
-        .client-pill {{ border:1px solid #CFE4F7; background:#FFFFFF; border-radius:999px; padding:.45rem .75rem; color:{PALETTE['white']}; font-weight:700; }}
+        .brand-logo {{ width:260px; max-width:100%; height:auto; display:block; }}
+        .client-pill {{ border:1px solid #CFE4F7; background:#FFFFFF; border-radius:999px; padding:.55rem .95rem; color:{PALETTE['white']}; font-weight:800; white-space:nowrap; }}
         .panel {{
             border:1px solid #D8E6F5; background:{PALETTE['panel']};
             border-radius:18px; padding:1rem; box-shadow:0 12px 30px rgba(15, 23, 42, .07);
@@ -966,8 +965,8 @@ def main() -> None:
 
     logo_uri = _image_data_uri(str(LOGO_PATH))
     logo_html = f'<img class="brand-logo" src="{logo_uri}" alt="Optiflow" />' if logo_uri else ""
-    header_left = f'<div class="brand-wrap">{logo_html}<div class="brand">OptiReco Pro</div></div>'
-    header_right = f'<div class="client-pill">Expert: {_html_escape(st.session_state.expert_name)}</div>'
+    header_left = f'<div class="brand-wrap">{logo_html}</div>'
+    header_right = '<div class="client-pill">Version Expert</div>'
     st.markdown(f'<div class="opti-header"><div>{header_left}</div><div>{header_right}</div></div>', unsafe_allow_html=True)
 
     tab_new, tab_product, tab_history = st.tabs(["Nouvelle recommandation", "Ajouter un produit", "Historique"])
