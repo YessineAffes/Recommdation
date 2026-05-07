@@ -333,15 +333,16 @@ def _inject_css() -> None:
         label, p, span {{ letter-spacing:0; }}
         @keyframes fadeIn {{ from {{ opacity:0; transform:translateY(8px); }} to {{ opacity:1; transform:translateY(0); }} }}
         @keyframes pulseIn {{ 0% {{ opacity:0; transform:scale(.98); }} 100% {{ opacity:1; transform:scale(1); }} }}
-        .ao {{ transform-box:fill-box; transform-origin:center; animation:logoPop 0.75s cubic-bezier(0.34,1.56,0.64,1) 0.3s both; }}
-        .ad {{ stroke-dasharray:42; stroke-dashoffset:42; animation:logoDraw 0.4s ease 1.05s forwards; }}
-        .ap {{ transform-box:fill-box; transform-origin:center; animation:logoPop 0.75s cubic-bezier(0.34,1.56,0.64,1) 1.45s both; }}
-        .aw {{ animation:logoWrite 1.15s ease 2.2s both; }}
-        .as {{ animation:logoFade 0.6s ease 3.4s both; }}
-        @keyframes logoPop  {{ 0%{{transform:scale(0);opacity:0}} 65%{{transform:scale(1.13)}} 100%{{transform:scale(1);opacity:1}} }}
-        @keyframes logoDraw {{ to{{stroke-dashoffset:0}} }}
-        @keyframes logoWrite{{ from{{clip-path:inset(0 100% 0 0)}} to{{clip-path:inset(0 0% 0 0)}} }}
-        @keyframes logoFade {{ from{{opacity:0;transform:translateY(7px)}} to{{opacity:1;transform:translateY(0)}} }}
+        .ao {{ transform-box:fill-box; transform-origin:center; animation:logoPop_ao 5s ease infinite; }}
+        .ad {{ stroke-dasharray:42; stroke-dashoffset:42; animation:logoDraw_ad 5s ease infinite; }}
+        .ap {{ transform-box:fill-box; transform-origin:center; animation:logoPop_ap 5s ease infinite; }}
+        .aw {{ animation:logoWrite_aw 5s ease infinite; }}
+        .as {{ animation:logoFade_as 5s ease infinite; }}
+        @keyframes logoPop_ao  {{ 0%,6%{{transform:scale(0);opacity:0}} 15%{{transform:scale(1.13);opacity:1}} 21%,100%{{transform:scale(1);opacity:1}} }}
+        @keyframes logoDraw_ad {{ 0%,21%{{stroke-dashoffset:42}} 29%,100%{{stroke-dashoffset:0}} }}
+        @keyframes logoPop_ap  {{ 0%,29%{{transform:scale(0);opacity:0}} 38%{{transform:scale(1.13);opacity:1}} 44%,100%{{transform:scale(1);opacity:1}} }}
+        @keyframes logoWrite_aw{{ 0%,44%{{clip-path:inset(0 100% 0 0)}} 67%,100%{{clip-path:inset(0 0% 0 0)}} }}
+        @keyframes logoFade_as {{ 0%,68%{{opacity:0;transform:translateY(7px)}} 80%,100%{{opacity:1;transform:translateY(0)}} }}
         @media (max-width: 1100px) {{ .step {{ grid-template-columns:2.15rem minmax(0,1fr); font-size:.82rem; }} .step-id {{ min-width:2rem; }} }}
         @media (max-width: 900px) {{ .progress-panel {{ max-height:none; }} .preview-panel {{ position:static; }} .opti-header {{ align-items:center; }} .brand-wrap {{ min-height:auto; }} .header-side {{ margin-left:0; }} .result-grid {{ grid-template-columns:1fr; }} }}
         </style>
