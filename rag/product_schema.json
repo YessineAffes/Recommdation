@@ -1,16 +1,45 @@
 {
-  "_comment": "Template JSON produit. Generee par admin/pages/product_form.py, ingeree par rag/rag_watcher.py.",
-  "_required": ["nom", "famille", "collection_cible"],
-
-  "nom": "",
-  "famille": "",
-  "sous_famille": "",
-  "description": "",
-  "indications": "",
-  "contre_indications": "",
-  "avantages": "",
-  "comparaison_precedent": "",
-  "collection_cible": "",
-  "source": "form",
-  "created_at": ""
+  "nom_produit": "Orma 1.50",
+  "concept": "La lumiere sous controle",
+  "plage_performance": {
+    "min": -300,
+    "max": 200
+  },
+  "avantages": [
+    "Protection UV : 5 a 7 fois plus performant qu'un verre photochromique standard",
+    "Protection lumiere bleue : 20% a 35% a l'interieur, 85% a 95% a l'exterieur",
+    "Intelligent : reduction eblouissement et fatigue visuelle",
+    "Pratique : multi-fonctions"
+  ],
+  "recommande_pour": "Pour les faibles ametropes a la recherche de verres intelligents, pratiques, protecteurs et tendances.",
+  "references": [
+    {
+      "nom": "Crizal Alize+UV Tr Brun",
+      "plage_stock": "-300 a +300",
+      "cyl_200": 77,
+      "cyl_100": 76,
+      "spherique": 75
+    },
+    {
+      "nom": "Crizal Alize+UV Tr Gris",
+      "plage_stock": "-400 a +300",
+      "cyl_200": 77,
+      "cyl_100": 76,
+      "spherique": 75
+    }
+  ],
+  "notes": [
+    {
+      "titre": "Brun Crizal Alize+UV disponible",
+      "contenu": "D70 de -3.00 a plan Cyl 2.00 / D65 de +0.25 a +3.00 Cyl 2.00"
+    },
+    {
+      "titre": "Gris Crizal Alize+UV disponible",
+      "contenu": "D70 de -4.00 a plan Cyl 2.00 / D65 de +0.25 a +3.00 Cyl 2.00"
+    },
+    {
+      "titre": "Disponibilite generale",
+      "contenu": "En stock uniquement en Brun & Gris"
+    }
+  ]
 }

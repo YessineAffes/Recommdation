@@ -9,54 +9,30 @@ L'application utilise une couche d'abstraction unique: changez uniquement `LLM_P
 Copiez `.env.example` vers `.env`, puis adaptez:
 
 - `LLM_PROVIDER=anthropic|ollama|openai_compat`
-- `LLM_AGENT_PROVIDER=anthropic|ollama|openai_compat`
 - `LLM_NLU_MODEL=...`
 - `LLM_FORMAT_MODEL=...`
-- `LLM_AGENT_MODEL=...`
 - `OLLAMA_BASE_URL=...`
 - `OPENAI_BASE_URL=...`
 - `ANTHROPIC_API_KEY=...`
 - `OPENAI_API_KEY=...`
 
-## Assistant Agent tool-calling
+## Ajout de fiches produits
 
-L'onglet `Assistant Agent` de `app.py` peut utiliser Anthropic ou Ollama/OpenAI-compatible avec les outils internes suivants : RAG, moteur de decision, prochaine question et explication finale. La recommandation finale reste obligatoirement produite par `DecisionEngine.decide(state)` via `tool_decide`.
+L'onglet `Ajouter un produit` de `app.py` permet de creer une fiche produit optique sous forme de formulaire, puis de generer un JSON structure selon le modele suivant :
 
-Configuration locale Ollama recommandee :
-
-```powershell
-ollama pull mistral
-$env:LLM_PROVIDER = "ollama"
-$env:LLM_AGENT_PROVIDER = "ollama"
-$env:LLM_AGENT_MODEL = "mistral"
-$env:OLLAMA_BASE_URL = "http://localhost:11434/v1"
-streamlit run app.py --server.port 8501
+```json
+{
+	"nom_produit": "Orma 1.50",
+	"concept": "La lumiere sous controle",
+	"plage_performance": {"min": -300, "max": 200},
+	"avantages": [],
+	"recommande_pour": "",
+	"references": [],
+	"notes": []
+}
 ```
 
-Pour utiliser Llama a la place :
-
-```powershell
-ollama pull llama3.1
-$env:LLM_AGENT_MODEL = "llama3.1"
-streamlit run app.py --server.port 8501
-```
-
-Sans modele Ollama installe et sans `ANTHROPIC_API_KEY`, l'onglet reste utilisable en mode local : il appelle les outils deterministes/RAG sans LLM. Pour activer Anthropic, choisir `anthropic` dans `Configuration du modele`, puis coller la cle ou la definir dans l'environnement/secrets.
-
-Configuration locale Anthropic :
-
-```powershell
-$env:ANTHROPIC_API_KEY = "votre-cle-anthropic"
-$env:LLM_AGENT_MODEL = "claude-sonnet-4-6"
-streamlit run app.py --server.port 8501
-```
-
-Configuration Streamlit Cloud dans les secrets :
-
-```toml
-ANTHROPIC_API_KEY = "votre-cle-anthropic"
-LLM_AGENT_MODEL = "claude-sonnet-4-6"
-```
+La fiche est enregistree dans `document_Produit/`, peut etre telechargee depuis l'interface, et est indexee dans la collection RAG choisie (`types_verres`, `indices`, `traitements` ou `couleurs`).
 
 ### Providers supportes
 

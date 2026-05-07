@@ -17,6 +17,7 @@ corrections.db-*
 chroma_db/
 chroma_db_taxonomy/
 agent_trace.log
+document_Produit/*.json
 
 # OS / editor
 .DS_Store

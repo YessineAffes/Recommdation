@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import hashlib
 import json
 import os
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -11,12 +11,13 @@ import streamlit as st
 from dotenv import load_dotenv
 
 from core.corrections_store import HISTORY_CORRECTED, HISTORY_PENDING, HISTORY_VALIDATED, CorrectionsStore
-from core.decision_engine import Recommendation
+from core.decision_engine import DecisionEngine, Recommendation
 from core.state_machine import DYNAMIC_RULES_PATH, get_next_action, should_skip_action
-from llm.agent import OpticalAgent
 from rag import rag_builder
+from rag.rag_watcher import ingest_product_payload
 
 ROOT = Path(__file__).resolve().parent
+PRODUCT_DOCS_PATH = ROOT / "document_Produit"
 load_dotenv(ROOT / ".env")
 
 PALETTE = {
@@ -84,17 +85,9 @@ def _init_session() -> None:
         "consultation_done": False,
         "last_feedback": None,
         "history": [],
-        "agent_chat_messages": [
-            {
-                "role": "assistant",
-                "content": "Bonjour. Je peux piloter les outils RAG, decision et explication pour une recommandation optique.",
-            }
-        ],
-        "agent_conversation_history": [],
-        "agent_last_result": None,
-        "agent_anthropic_api_key": "",
-        "agent_provider_override": "",
-        "agent_model_override": "",
+        "product_last_payload": None,
+        "product_last_file": None,
+        "product_last_result": None,
     }
     for key, value in defaults.items():
         st.session_state.setdefault(key, value)
@@ -124,71 +117,14 @@ def _database_url() -> str | None:
     return os.getenv("DATABASE_URL") or _streamlit_secret("DATABASE_URL")
 
 
-def _anthropic_api_key() -> str | None:
-    session_key = str(st.session_state.get("agent_anthropic_api_key") or "").strip()
-    return os.getenv("ANTHROPIC_API_KEY") or _streamlit_secret("ANTHROPIC_API_KEY") or session_key or None
-
-
-def _secret_fingerprint(value: str | None) -> str:
-    if not value:
-        return "missing"
-    return hashlib.sha256(value.encode("utf-8")).hexdigest()[:12]
-
-
-def _agent_model() -> str | None:
-    session_model = str(st.session_state.get("agent_model_override") or "").strip()
-    if session_model:
-        return session_model
-    return (
-        os.getenv("LLM_AGENT_MODEL")
-        or _streamlit_secret("LLM_AGENT_MODEL")
-        or os.getenv("LLM_FORMAT_MODEL")
-        or _streamlit_secret("LLM_FORMAT_MODEL")
-    )
-
-
-def _agent_provider() -> str:
-    session_provider = str(st.session_state.get("agent_provider_override") or "").strip()
-    provider = session_provider or os.getenv("LLM_AGENT_PROVIDER") or _streamlit_secret("LLM_AGENT_PROVIDER") or os.getenv("LLM_PROVIDER") or "ollama"
-    provider = provider.strip().lower()
-    if provider in ("openai-compatible", "openai_compatible", "openai"):
-        return "openai_compat"
-    return provider
-
-
-def _agent_base_url(provider: str) -> str | None:
-    if provider == "ollama":
-        return os.getenv("OLLAMA_BASE_URL") or _streamlit_secret("OLLAMA_BASE_URL") or "http://localhost:11434/v1"
-    if provider == "openai_compat":
-        return os.getenv("OPENAI_BASE_URL") or _streamlit_secret("OPENAI_BASE_URL") or os.getenv("OLLAMA_BASE_URL") or "http://localhost:11434/v1"
-    return None
-
-
 @st.cache_resource(show_spinner=False)
 def _get_store(database_url: str | None) -> CorrectionsStore:
     return CorrectionsStore(database_url=database_url)
 
 
 @st.cache_resource(show_spinner=False)
-def _get_agent(
-    rules_mtime_ns: int,
-    database_url: str,
-    provider: str,
-    base_url: str | None,
-    api_key_configured: bool,
-    api_key_fingerprint: str,
-    model: str | None,
-    _store: CorrectionsStore,
-    _anthropic_api_key: str | None,
-) -> OpticalAgent:
-    return OpticalAgent(
-        corrections_store=_store,
-        reload_on_decide=False,
-        anthropic_api_key=_anthropic_api_key,
-        provider=provider,
-        openai_base_url=base_url,
-        model=model,
-    )
+def _get_engine(rules_mtime_ns: int, database_url: str, _store: CorrectionsStore) -> DecisionEngine:
+    return DecisionEngine(corrections_store=_store, reload_on_decide=False)
 
 
 @st.cache_data(show_spinner=False, ttl=3600)
@@ -249,11 +185,11 @@ def _confidence(done: int, total: int, rec: Recommendation | None) -> int:
     return min(base, 98)
 
 
-def _try_live_reco(state: dict[str, Any], agent: OpticalAgent) -> Recommendation | None:
+def _try_live_reco(state: dict[str, Any], engine: DecisionEngine) -> Recommendation | None:
     if "Q1_age" not in state:
         return None
     try:
-        return agent.decide(state)
+        return engine.decide(state)
     except Exception:
         return None
 
@@ -630,196 +566,161 @@ def _render_history(store: CorrectionsStore, database_url: str | None) -> None:
                 st.write(row["notes"])
 
 
-def _reset_agent_chat() -> None:
-    st.session_state.agent_chat_messages = [
-        {
-            "role": "assistant",
-            "content": "Bonjour. Je peux piloter les outils RAG, decision et explication pour une recommandation optique.",
-        }
-    ]
-    st.session_state.agent_conversation_history = []
-    st.session_state.agent_last_result = None
+def _slug(value: str) -> str:
+    slug = re.sub(r"[^A-Za-z0-9]+", "_", value.strip()).strip("_")
+    return slug or "produit"
 
 
-def _run_agent_chat_message(agent: OpticalAgent, message: str, display_message: str | None = None) -> None:
-    st.session_state.agent_chat_messages.append({"role": "user", "content": display_message or message})
+def _lines(value: str) -> list[str]:
+    return [line.strip() for line in value.splitlines() if line.strip()]
+
+
+def _clean_int(value: Any) -> int | None:
+    if value in (None, ""):
+        return None
     try:
-        result = agent.run(message, st.session_state.agent_conversation_history)
-        st.session_state.agent_conversation_history = result.get("conversation_history", [])
-        assistant_message = str(result.get("message") or "Reponse agent vide.")
-    except Exception as exc:
-        result = {"type": "error", "message": str(exc), "tool_calls": [], "iterations": 0}
-        assistant_message = f"Erreur agent : {exc}"
-    st.session_state.agent_last_result = result
-    st.session_state.agent_chat_messages.append({"role": "assistant", "content": assistant_message})
+        return int(value)
+    except (TypeError, ValueError):
+        return None
 
 
-def _run_local_agent_message(agent: OpticalAgent, state: dict[str, Any], message: str, display_message: str | None = None) -> None:
-    st.session_state.agent_chat_messages.append({"role": "user", "content": display_message or message})
-    try:
-        if "Q1_age" not in state:
-            next_step = agent.ask_next_question(state, message)
-            question = next_step.get("question") or {}
-            assistant_message = "Mode local actif. Commencez la consultation avec la premiere question."
-            if question.get("label"):
-                assistant_message += f"\n\nProchaine question : **{question['label']}**"
-            result = {"type": "local", "message": assistant_message, "tool_calls": list(agent.tool_calls[-1:]), "iterations": 1}
-        else:
-            rec = agent.decide(state)
-            context_parts: list[str] = []
-            lookups = [
-                (rec.type_verre, "types_verres"),
-                (rec.indice, "indices"),
-                (rec.traitement, "traitements"),
-                (rec.couleur, "couleurs"),
-            ]
-            start_call_index = max(0, len(agent.tool_calls) - 1)
-            for query, collection in lookups:
-                if query:
-                    context = agent.rag_retrieve(str(query), collection)
-                    if context:
-                        context_parts.append(context.split("---", 1)[0].strip())
-            assistant_message = _local_recommendation_markdown(rec, context_parts)
-            result = {
-                "type": "local",
-                "message": assistant_message,
-                "tool_calls": list(agent.tool_calls[start_call_index:]),
-                "iterations": 1,
+def _clean_reference_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    cleaned: list[dict[str, Any]] = []
+    for row in rows:
+        name = str(row.get("nom") or "").strip()
+        if not name:
+            continue
+        cleaned.append(
+            {
+                "nom": name,
+                "plage_stock": str(row.get("plage_stock") or "").strip(),
+                "cyl_200": _clean_int(row.get("cyl_200")),
+                "cyl_100": _clean_int(row.get("cyl_100")),
+                "spherique": _clean_int(row.get("spherique")),
             }
-    except Exception as exc:
-        result = {"type": "error", "message": str(exc), "tool_calls": [], "iterations": 0}
-        assistant_message = f"Erreur mode local : {exc}"
-    st.session_state.agent_last_result = result
-    st.session_state.agent_chat_messages.append({"role": "assistant", "content": assistant_message})
+        )
+    return cleaned
 
 
-def _local_recommendation_markdown(rec: Recommendation, context_parts: list[str]) -> str:
-    lines = [
-        "Mode local : recommandation calculee par les outils internes, sans appel Anthropic.",
-        "",
-        f"- Type : **{rec.type_verre}**",
-        f"- Indice : **{rec.indice}**",
-        f"- Traitement : **{rec.traitement}**",
-        f"- Couleur : **{rec.couleur}**",
+def _clean_note_rows(rows: list[dict[str, Any]]) -> list[dict[str, str]]:
+    cleaned: list[dict[str, str]] = []
+    for row in rows:
+        title = str(row.get("titre") or "").strip()
+        content = str(row.get("contenu") or "").strip()
+        if title or content:
+            cleaned.append({"titre": title, "contenu": content})
+    return cleaned
+
+
+def _render_product_form() -> None:
+    st.subheader("Ajouter un produit")
+    st.caption("Cree une fiche produit JSON structuree, l'enregistre localement et l'indexe dans le RAG.")
+
+    default_references = [
+        {"nom": "Crizal Alize+UV Tr Brun", "plage_stock": "-300 a +300", "cyl_200": 77, "cyl_100": 76, "spherique": 75},
+        {"nom": "Crizal Alize+UV Tr Gris", "plage_stock": "-400 a +300", "cyl_200": 77, "cyl_100": 76, "spherique": 75},
     ]
-    if rec.corridor_type:
-        lines.append(f"- Corridor : **{rec.corridor_type}**")
-    if rec.trace:
-        lines.extend(["", "Trace decision :"])
-        lines.extend(f"- {item}" for item in rec.trace[:6])
-    if context_parts:
-        lines.extend(["", "Extraits RAG :"])
-        lines.extend(f"- {part}" for part in context_parts[:3])
-    return "\n".join(lines)
+    default_notes = [
+        {"titre": "Brun Crizal Alize+UV disponible", "contenu": "D70 de -3.00 a plan Cyl 2.00 / D65 de +0.25 a +3.00 Cyl 2.00"},
+        {"titre": "Gris Crizal Alize+UV disponible", "contenu": "D70 de -4.00 a plan Cyl 2.00 / D65 de +0.25 a +3.00 Cyl 2.00"},
+        {"titre": "Disponibilite generale", "contenu": "En stock uniquement en Brun & Gris"},
+    ]
 
-
-def _render_agent_trace(result: dict[str, Any] | None) -> None:
-    if not result:
-        return
-    tool_calls = result.get("tool_calls") or []
-    cols = st.columns([1, 1, 2])
-    cols[0].metric("Iterations", result.get("iterations", 0))
-    cols[1].metric("Outils", len(tool_calls))
-    cols[2].caption(f"Statut : {result.get('type', '-')}")
-    if not tool_calls:
-        return
-    with st.expander("Trace outils du dernier message", expanded=False):
-        for call in tool_calls:
-            st.code(json.dumps(call, ensure_ascii=False, indent=2, default=str), language="json")
-
-
-def _render_agent_chat(agent: OpticalAgent, state: dict[str, Any], provider: str, api_key_present: bool, model: str, base_url: str | None) -> None:
-    st.subheader("Assistant Agent")
-    top_left, top_right = st.columns([2, 1])
-    with top_left:
-        st.caption(f"Provider : {provider} | Modele : {model}")
-    with top_right:
-        if st.button("Reinitialiser le chat", use_container_width=True):
-            _reset_agent_chat()
-            st.rerun()
-
-    uses_anthropic = provider == "anthropic"
-    agent_ready = not uses_anthropic or api_key_present
-
-    with st.expander("Configuration du modele", expanded=not agent_ready):
-        provider_options = ["ollama", "anthropic", "openai_compat"]
-        selected_provider = st.selectbox(
-            "Provider agent",
-            provider_options,
-            index=provider_options.index(provider) if provider in provider_options else 0,
-            key="agent_provider_select",
-        )
-        if selected_provider != provider:
-            st.session_state.agent_provider_override = selected_provider
-            _get_agent.clear()
-            st.rerun()
-
-        model_value = st.text_input("LLM_AGENT_MODEL", value=model, key="agent_model_input")
-        if st.button("Appliquer le modele", use_container_width=True, disabled=not model_value.strip()):
-            st.session_state.agent_model_override = model_value.strip()
-            _get_agent.clear()
-            st.rerun()
-
-        if provider == "ollama":
-            st.info(f"Ollama local actif. Base URL : {base_url or 'http://localhost:11434/v1'}. Si le modele n'est pas installe, lancez `ollama pull {model}`.")
-        elif provider == "openai_compat":
-            st.info(f"Provider OpenAI-compatible actif. Base URL : {base_url or '-'}.")
-        elif api_key_present:
-            st.success("Cle Anthropic detectee. Le chat utilise Anthropic tool-calling.")
-        else:
-            st.info("Aucune cle Anthropic detectee. Le chat basculera en mode local tant que la cle manque.")
-
-        typed_key = st.text_input(
-            "ANTHROPIC_API_KEY",
-            type="password",
-            placeholder="sk-ant-...",
-            key="agent_api_key_input",
-            disabled=not uses_anthropic,
-        )
-        save_col, clear_col = st.columns(2)
-        with save_col:
-            if st.button("Utiliser cette cle", use_container_width=True, disabled=not uses_anthropic or not typed_key.strip()):
-                st.session_state.agent_anthropic_api_key = typed_key.strip()
-                _get_agent.clear()
-                st.rerun()
-        with clear_col:
-            if st.button("Oublier la cle de session", use_container_width=True, disabled=not uses_anthropic or not st.session_state.get("agent_anthropic_api_key")):
-                st.session_state.agent_anthropic_api_key = ""
-                _get_agent.clear()
-                st.rerun()
-
-    if not agent_ready:
-        st.warning("Mode local actif : aucune cle Anthropic n'est configuree. Choisissez `ollama` pour un modele local sans cle API, ou ajoutez une cle Anthropic.")
-
-    action_cols = st.columns([1, 2])
-    with action_cols[0]:
-        action_label = f"Analyser avec {provider}" if agent_ready else "Analyser en mode local"
-        if st.button(action_label, use_container_width=True, disabled=not state):
-            payload = json.dumps(state, ensure_ascii=False, indent=2, default=str)
-            message = (
-                "Analyse cette consultation optique avec tes outils. "
-                "Utilise tool_decide pour toute recommandation et explique le resultat final.\n\n"
-                f"State courant:\n{payload}"
+    with st.form("product_catalog_form"):
+        left, right = st.columns([1, 1])
+        with left:
+            nom_produit = st.text_input("Nom produit", value="Orma 1.50")
+            concept = st.text_input("Concept", value="La lumiere sous controle")
+            min_perf = st.number_input("Plage performance min", value=-300, step=25)
+            max_perf = st.number_input("Plage performance max", value=200, step=25)
+            collection_cible = st.selectbox("Collection RAG cible", rag_builder.COLLECTIONS, index=0)
+        with right:
+            avantages_text = st.text_area(
+                "Avantages (une ligne par avantage)",
+                value=(
+                    "Protection UV : 5 a 7 fois plus performant qu'un verre photochromique standard\n"
+                    "Protection lumiere bleue : 20% a 35% a l'interieur, 85% a 95% a l'exterieur\n"
+                    "Intelligent : reduction eblouissement et fatigue visuelle\n"
+                    "Pratique : multi-fonctions"
+                ),
+                height=140,
             )
-            if agent_ready:
-                _run_agent_chat_message(agent, message, action_label)
-            else:
-                _run_local_agent_message(agent, state, message, action_label)
-            st.rerun()
+            recommande_pour = st.text_area(
+                "A qui recommander ?",
+                value="Pour les faibles ametropes a la recherche de verres intelligents, pratiques, protecteurs et tendances.",
+                height=140,
+            )
 
-    for msg in st.session_state.agent_chat_messages:
-        with st.chat_message(str(msg.get("role", "assistant"))):
-            st.markdown(str(msg.get("content", "")))
+        references = st.data_editor(
+            default_references,
+            key="product_references_editor",
+            hide_index=True,
+            num_rows="dynamic",
+            use_container_width=True,
+            column_config={
+                "nom": st.column_config.TextColumn("Reference", required=True),
+                "plage_stock": st.column_config.TextColumn("Plage stock"),
+                "cyl_200": st.column_config.NumberColumn("Cyl 200", step=1),
+                "cyl_100": st.column_config.NumberColumn("Cyl 100", step=1),
+                "spherique": st.column_config.NumberColumn("Spherique", step=1),
+            },
+        )
+        notes = st.data_editor(
+            default_notes,
+            key="product_notes_editor",
+            hide_index=True,
+            num_rows="dynamic",
+            use_container_width=True,
+            column_config={
+                "titre": st.column_config.TextColumn("Titre"),
+                "contenu": st.column_config.TextColumn("Contenu"),
+            },
+        )
+        submitted = st.form_submit_button("Creer et indexer le produit", use_container_width=True)
 
-    _render_agent_trace(st.session_state.agent_last_result)
+    if submitted:
+        if not nom_produit.strip():
+            st.error("Le nom du produit est obligatoire.")
+            return
+        payload = {
+            "nom_produit": nom_produit.strip(),
+            "concept": concept.strip(),
+            "plage_performance": {"min": int(min_perf), "max": int(max_perf)},
+            "avantages": _lines(avantages_text),
+            "recommande_pour": recommande_pour.strip(),
+            "references": _clean_reference_rows(list(references)),
+            "notes": _clean_note_rows(list(notes)),
+        }
+        PRODUCT_DOCS_PATH.mkdir(parents=True, exist_ok=True)
+        filename = f"product_{_slug(nom_produit)}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        filepath = PRODUCT_DOCS_PATH / filename
+        json_payload = json.dumps(payload, indent=2, ensure_ascii=False)
+        filepath.write_text(json_payload, encoding="utf-8")
+        result = ingest_product_payload(payload, source_name=filename, collection_cible=collection_cible)
 
-    prompt = st.chat_input("Message a l'assistant agent", key="agent_chat_input")
-    if prompt:
-        if agent_ready:
-            _run_agent_chat_message(agent, prompt)
+        st.session_state.product_last_payload = payload
+        st.session_state.product_last_file = str(filepath)
+        st.session_state.product_last_result = result
+
+        if result.get("ok"):
+            st.success(f"Produit cree et indexe dans la collection {result['collection']}.")
         else:
-            _run_local_agent_message(agent, state, prompt)
-        st.rerun()
+            st.error(f"Produit cree, mais ingestion RAG echouee : {result.get('message')}")
+
+    if st.session_state.product_last_payload:
+        st.markdown("**Derniere fiche produit generee**")
+        st.json(st.session_state.product_last_payload)
+        if st.session_state.product_last_file:
+            st.caption(f"Fichier local : {st.session_state.product_last_file}")
+        st.download_button(
+            "Telecharger le JSON",
+            data=json.dumps(st.session_state.product_last_payload, indent=2, ensure_ascii=False),
+            file_name=Path(st.session_state.product_last_file or "produit.json").name,
+            mime="application/json",
+            use_container_width=True,
+        )
+        if st.session_state.product_last_result:
+            st.json(st.session_state.product_last_result)
 
 
 def _render_final(
@@ -898,23 +799,9 @@ def main() -> None:
     _require_login()
 
     database_url = _database_url()
-    agent_provider = _agent_provider()
-    agent_base_url = _agent_base_url(agent_provider)
-    anthropic_api_key = _anthropic_api_key()
-    agent_model = _agent_model()
     rules_token = _rules_cache_token()
     store = _get_store(database_url)
-    agent = _get_agent(
-        rules_token,
-        database_url or "sqlite",
-        agent_provider,
-        agent_base_url,
-        bool(anthropic_api_key),
-        _secret_fingerprint(anthropic_api_key),
-        agent_model,
-        store,
-        anthropic_api_key,
-    )
+    engine = _get_engine(rules_token, database_url or "sqlite", store)
     rules = _load_rules(rules_token)
     flow = _question_flow(rules)
     state = st.session_state.consultation_state
@@ -924,7 +811,7 @@ def main() -> None:
     header_right = f'<div class="client-pill">Expert: {_html_escape(st.session_state.expert_name)}</div>'
     st.markdown(f'<div class="opti-header"><div>{header_left}</div><div>{header_right}</div></div>', unsafe_allow_html=True)
 
-    tab_new, tab_agent, tab_history = st.tabs(["Nouvelle recommandation", "Assistant Agent", "Historique"])
+    tab_new, tab_product, tab_history = st.tabs(["Nouvelle recommandation", "Ajouter un produit", "Historique"])
 
     with tab_new:
         top1, top2, top3 = st.columns([2.3, 1, 1])
@@ -937,13 +824,13 @@ def main() -> None:
                 _reset_consultation()
                 st.rerun()
 
-        rec = _try_live_reco(state, agent)
+        rec = _try_live_reco(state, engine)
         col1, col2, col3 = st.columns([1.35, 2.45, 1.25], gap="medium")
         with col1:
             done, total = _render_progress(flow, state, current, rules)
         with col2:
             if current > 22:
-                final_rec = agent.decide(state)
+                final_rec = engine.decide(state)
                 record_id = _ensure_history_record(store, state, final_rec)
                 _render_final(final_rec, state, rules, store, record_id)
             else:
@@ -962,8 +849,8 @@ def main() -> None:
         with col3:
             _render_live_preview(rec, done, total)
 
-    with tab_agent:
-        _render_agent_chat(agent, state, agent_provider, bool(anthropic_api_key), agent_model or agent.model, agent_base_url)
+    with tab_product:
+        _render_product_form()
 
     with tab_history:
         _render_history(store, database_url)

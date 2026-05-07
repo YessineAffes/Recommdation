@@ -167,3 +167,39 @@ def test_ingest_product_json(tmp_path, monkeypatch):
     result = rag_watcher.ingest_product_json(fp)
     assert result["ok"] is True
     assert result["collection"] == "types_verres"
+
+
+def test_ingest_product_payload_new_optical_card_schema(tmp_path, monkeypatch):
+    from rag import rag_watcher
+
+    import rag.rag_builder as rb
+    monkeypatch.setattr(rb, "DB_PATH", tmp_path / "chroma_card")
+    rb._client.cache_clear()
+
+    payload = {
+        "nom_produit": "Orma 1.50",
+        "concept": "La lumiere sous controle",
+        "plage_performance": {"min": -300, "max": 200},
+        "avantages": ["Protection UV", "Protection lumiere bleue"],
+        "recommande_pour": "Pour les faibles ametropes.",
+        "references": [
+            {
+                "nom": "Crizal Alize+UV Tr Brun",
+                "plage_stock": "-300 a +300",
+                "cyl_200": 77,
+                "cyl_100": 76,
+                "spherique": 75,
+            }
+        ],
+        "notes": [{"titre": "Disponibilite generale", "contenu": "En stock uniquement en Brun & Gris"}],
+    }
+
+    result = rag_watcher.ingest_product_payload(payload, source_name="orma_150.json", collection_cible="types_verres")
+    assert result["ok"] is True
+    assert result["collection"] == "types_verres"
+
+    context = rb.get_context("Orma 1.50", "types_verres", n=1)
+    assert "Orma 1.50" in context
+    assert "La lumiere sous controle" in context
+
+    rb._client.cache_clear()

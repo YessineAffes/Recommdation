@@ -11,8 +11,60 @@ ROOT = Path(__file__).resolve().parent.parent
 DOCS_PATH = ROOT / "rag" / "documents"
 
 
+def _product_name(data: dict[str, Any]) -> str:
+    return str(data.get("nom") or data.get("nom_produit") or "").strip()
+
+
+def _infer_collection(data: dict[str, Any]) -> str:
+    text = " ".join(
+        str(value)
+        for value in (
+            data.get("nom"),
+            data.get("nom_produit"),
+            data.get("famille"),
+            data.get("concept"),
+            data.get("description"),
+        )
+        if value
+    ).lower()
+    if any(keyword in text for keyword in ("crizal", "traitement", "prevencia", "sapphire", "alize")):
+        return "traitements"
+    if any(keyword in text for keyword in ("transition", "transitions", "brun", "gris", "photochromique", "solaire")):
+        return "couleurs"
+    if any(keyword in text for keyword in ("indice", "1.50", "1.60", "1.67", "1.74")):
+        return "indices"
+    return "types_verres"
+
+
 def _build_product_text(data: dict[str, Any]) -> str:
     parts: list[str] = []
+    if data.get("nom_produit"):
+        parts.append(f"Produit: {data['nom_produit']}")
+    if data.get("concept"):
+        parts.append(f"Concept: {data['concept']}")
+    plage = data.get("plage_performance")
+    if isinstance(plage, dict):
+        parts.append(f"Plage de performance: {plage.get('min')} a {plage.get('max')}")
+    avantages = data.get("avantages")
+    if isinstance(avantages, list):
+        parts.extend(f"Avantage: {item}" for item in avantages if str(item).strip())
+    elif avantages:
+        parts.append(f"Avantages: {avantages}")
+    if data.get("recommande_pour"):
+        parts.append(f"Recommande pour: {data['recommande_pour']}")
+    for reference in data.get("references") or []:
+        if not isinstance(reference, dict):
+            continue
+        parts.append(
+            "Reference: "
+            f"{reference.get('nom', '')}; plage stock {reference.get('plage_stock', '')}; "
+            f"cyl 200 {reference.get('cyl_200', '')}; cyl 100 {reference.get('cyl_100', '')}; "
+            f"spherique {reference.get('spherique', '')}"
+        )
+    for note in data.get("notes") or []:
+        if isinstance(note, dict):
+            parts.append(f"Note: {note.get('titre', '')} - {note.get('contenu', '')}")
+
     if data.get("nom"):
         parts.append(f"Produit: {data['nom']}")
     if data.get("famille"):
@@ -32,6 +84,54 @@ def _build_product_text(data: dict[str, Any]) -> str:
     return "\n".join(parts)
 
 
+def ingest_product_payload(
+    data: dict[str, Any],
+    *,
+    source_name: str = "product_form.json",
+    collection_cible: str | None = None,
+) -> dict[str, Any]:
+    """Ingere un payload produit deja charge, ancien ou nouveau schema."""
+    collection = collection_cible or data.get("collection_cible") or _infer_collection(data)
+    if collection not in COLLECTIONS:
+        return {
+            "ok": False,
+            "message": f"collection_cible '{collection}' invalide (attendu: {COLLECTIONS})",
+        }
+
+    name = _product_name(data)
+    if not name:
+        return {"ok": False, "message": "Champ 'nom' ou 'nom_produit' obligatoire"}
+
+    text = _build_product_text(data)
+    if not text.strip():
+        return {"ok": False, "message": "Texte d'ingestion vide"}
+
+    client = _client()
+    coll = client.get_or_create_collection(collection)
+
+    stem = Path(source_name).stem
+    doc_id = f"product_{stem}"
+    metadata = {
+        "collection": collection,
+        "source": "form",
+        "nom": name,
+        "famille": str(data.get("famille") or ""),
+        "filename": Path(source_name).name,
+    }
+    existing = set(coll.get().get("ids", []))
+    if doc_id in existing:
+        coll.update(ids=[doc_id], documents=[text], metadatas=[metadata])
+    else:
+        coll.add(ids=[doc_id], documents=[text], metadatas=[metadata])
+
+    return {
+        "ok": True,
+        "collection": collection,
+        "id": doc_id,
+        "message": f"Produit '{name}' indexe dans '{collection}'",
+    }
+
+
 def ingest_product_json(filepath: str | Path) -> dict[str, Any]:
     """Ingere un fichier produit JSON dans la collection ChromaDB cible.
 
@@ -46,43 +146,7 @@ def ingest_product_json(filepath: str | Path) -> dict[str, Any]:
     except json.JSONDecodeError as e:
         return {"ok": False, "message": f"JSON invalide: {e}"}
 
-    collection = data.get("collection_cible")
-    if collection not in COLLECTIONS:
-        return {
-            "ok": False,
-            "message": f"collection_cible '{collection}' invalide (attendu: {COLLECTIONS})",
-        }
-    if not data.get("nom"):
-        return {"ok": False, "message": "Champ 'nom' obligatoire"}
-
-    text = _build_product_text(data)
-    if not text.strip():
-        return {"ok": False, "message": "Texte d'ingestion vide"}
-
-    client = _client()
-    coll = client.get_or_create_collection(collection)
-
-    doc_id = f"product_{fp.stem}"
-    metadata = {
-        "collection": collection,
-        "source": "form",
-        "nom": data.get("nom", ""),
-        "famille": data.get("famille", ""),
-        "filename": fp.name,
-    }
-    # upsert : si l'id existe, on remplace
-    existing = set(coll.get().get("ids", []))
-    if doc_id in existing:
-        coll.update(ids=[doc_id], documents=[text], metadatas=[metadata])
-    else:
-        coll.add(ids=[doc_id], documents=[text], metadatas=[metadata])
-
-    return {
-        "ok": True,
-        "collection": collection,
-        "id": doc_id,
-        "message": f"Produit '{data['nom']}' indexe dans '{collection}'",
-    }
+    return ingest_product_payload(data, source_name=fp.name)
 
 
 def watch_once(folder: Path | None = None) -> dict[str, Any]:
