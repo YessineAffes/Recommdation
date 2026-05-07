@@ -713,50 +713,42 @@ def _render_product_form(store: CorrectionsStore) -> None:
     st.subheader("Ajouter un produit")
     st.caption("Cree une fiche produit JSON structuree, l'enregistre localement et l'indexe dans le RAG.")
 
-    default_references_json = json.dumps([
-        {"nom": "Crizal Alize+UV Tr Brun", "plage_stock": "-300 a +300", "cyl_200": 77, "cyl_100": 76, "spherique": 75},
-        {"nom": "Crizal Alize+UV Tr Gris", "plage_stock": "-400 a +300", "cyl_200": 77, "cyl_100": 76, "spherique": 75},
+    empty_references_json = json.dumps([
+        {"nom": "", "plage_stock": "", "cyl_200": None, "cyl_100": None, "spherique": None},
     ], indent=2, ensure_ascii=False)
-    default_notes_json = json.dumps([
-        {"titre": "Brun Crizal Alize+UV disponible", "contenu": "D70 de -3.00 a plan Cyl 2.00 / D65 de +0.25 a +3.00 Cyl 2.00"},
-        {"titre": "Gris Crizal Alize+UV disponible", "contenu": "D70 de -4.00 a plan Cyl 2.00 / D65 de +0.25 a +3.00 Cyl 2.00"},
-        {"titre": "Disponibilite generale", "contenu": "En stock uniquement en Brun & Gris"},
+    empty_notes_json = json.dumps([
+        {"titre": "", "contenu": ""},
     ], indent=2, ensure_ascii=False)
 
     with st.form("product_catalog_form"):
         left, right = st.columns([1, 1])
         with left:
-            nom_produit = st.text_input("Nom produit", value="Orma 1.50")
-            concept = st.text_input("Concept", value="La lumiere sous controle")
-            min_perf = st.number_input("Plage performance min", value=-300, step=25)
-            max_perf = st.number_input("Plage performance max", value=200, step=25)
+            nom_produit = st.text_input("Nom produit", value="")
+            concept = st.text_input("Concept", value="")
+            min_perf = st.number_input("Plage performance min", value=0, step=25)
+            max_perf = st.number_input("Plage performance max", value=0, step=25)
             collection_cible = st.selectbox("Collection RAG cible", rag_builder.COLLECTIONS, index=0)
         with right:
             avantages_text = st.text_area(
                 "Avantages (une ligne par avantage)",
-                value=(
-                    "Protection UV : 5 a 7 fois plus performant qu'un verre photochromique standard\n"
-                    "Protection lumiere bleue : 20% a 35% a l'interieur, 85% a 95% a l'exterieur\n"
-                    "Intelligent : reduction eblouissement et fatigue visuelle\n"
-                    "Pratique : multi-fonctions"
-                ),
+                value="",
                 height=140,
             )
             recommande_pour = st.text_area(
                 "A qui recommander ?",
-                value="Pour les faibles ametropes a la recherche de verres intelligents, pratiques, protecteurs et tendances.",
+                value="",
                 height=140,
             )
 
         references_text = st.text_area(
             "References (JSON)",
-            value=default_references_json,
+            value=empty_references_json,
             height=160,
             help='Liste JSON : [{"nom": "...", "plage_stock": "...", "cyl_200": 77, "cyl_100": 76, "spherique": 75}]',
         )
         notes_text = st.text_area(
             "Notes (JSON)",
-            value=default_notes_json,
+            value=empty_notes_json,
             height=130,
             help='Liste JSON : [{"titre": "...", "contenu": "..."}]',
         )
