@@ -612,7 +612,7 @@ def _clean_note_rows(rows: list[dict[str, Any]]) -> list[dict[str, str]]:
     return cleaned
 
 
-def _render_product_form() -> None:
+def _render_product_form(store: CorrectionsStore) -> None:
     st.subheader("Ajouter un produit")
     st.caption("Cree une fiche produit JSON structuree, l'enregistre localement et l'indexe dans le RAG.")
 
@@ -698,12 +698,28 @@ def _render_product_form() -> None:
         filepath.write_text(json_payload, encoding="utf-8")
         result = ingest_product_payload(payload, source_name=filename, collection_cible=collection_cible)
 
+        product_id: int | None = None
+        try:
+            product_id = store.add_product_card(
+                payload=payload,
+                collection_cible=collection_cible,
+                expert_name=st.session_state.expert_name,
+                source_file=filename,
+                rag_result=result,
+            )
+        except Exception as exc:
+            st.error(f"Echec enregistrement PostgreSQL/Supabase : {exc}")
+
         st.session_state.product_last_payload = payload
         st.session_state.product_last_file = str(filepath)
         st.session_state.product_last_result = result
+        if product_id is not None:
+            st.session_state.product_last_result["product_card_id"] = product_id
 
         if result.get("ok"):
             st.success(f"Produit cree et indexe dans la collection {result['collection']}.")
+            if product_id is not None:
+                st.caption(f"Enregistre en base (Supabase/PostgreSQL) sous l'identifiant #{product_id}.")
         else:
             st.error(f"Produit cree, mais ingestion RAG echouee : {result.get('message')}")
 
@@ -721,6 +737,22 @@ def _render_product_form() -> None:
         )
         if st.session_state.product_last_result:
             st.json(st.session_state.product_last_result)
+
+    with st.expander("Dernieres fiches produits en base", expanded=False):
+        rows = store.list_product_cards(limit=10)
+        if not rows:
+            st.info("Aucune fiche produit enregistree en base pour le moment.")
+        for row in rows:
+            created = str(row.get("created_at", "")).replace("T", " ")[:19]
+            header = f"#{row['id']} - {row.get('product_name', '-') } - {created}"
+            with st.container(border=True):
+                st.markdown(f"**{_html_escape(header)}**")
+                st.caption(
+                    f"Collection: {row.get('collection_cible', '-')} | "
+                    f"Expert: {row.get('expert_name') or '-'} | "
+                    f"Fichier: {row.get('source_file') or '-'}"
+                )
+                st.json(row.get("payload_data") or {})
 
 
 def _render_final(
@@ -850,7 +882,7 @@ def main() -> None:
             _render_live_preview(rec, done, total)
 
     with tab_product:
-        _render_product_form()
+        _render_product_form(store)
 
     with tab_history:
         _render_history(store, database_url)

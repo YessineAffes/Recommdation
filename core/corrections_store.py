@@ -77,6 +77,22 @@ Index("idx_history_created", history_table.c.created_at)
 Index("idx_history_status", history_table.c.status, history_table.c.updated_at)
 Index("idx_history_hash", history_table.c.state_hash)
 
+product_cards_table = Table(
+    "product_cards",
+    metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("created_at", Text, nullable=False),
+    Column("updated_at", Text, nullable=False),
+    Column("expert_name", Text),
+    Column("product_name", Text, nullable=False),
+    Column("collection_cible", Text, nullable=False),
+    Column("source_file", Text),
+    Column("payload_json", Text, nullable=False),
+    Column("rag_result_json", Text),
+)
+Index("idx_product_cards_created", product_cards_table.c.created_at)
+Index("idx_product_cards_collection", product_cards_table.c.collection_cible, product_cards_table.c.updated_at)
+
 _CORRECTION_BUCKETS = {
     "<200": 1.00,
     "225-400": 3.10,
@@ -199,6 +215,62 @@ class CorrectionsStore:
             except (json.JSONDecodeError, TypeError):
                 data[parsed_key] = raw
         return data
+
+    def _decode_product_row(self, row: Any) -> dict[str, Any]:
+        data = dict(row)
+        payload_raw = data.get("payload_json")
+        rag_raw = data.get("rag_result_json")
+        try:
+            data["payload_data"] = json.loads(payload_raw) if payload_raw else None
+        except (json.JSONDecodeError, TypeError):
+            data["payload_data"] = payload_raw
+        try:
+            data["rag_result_data"] = json.loads(rag_raw) if rag_raw else None
+        except (json.JSONDecodeError, TypeError):
+            data["rag_result_data"] = rag_raw
+        return data
+
+    def add_product_card(
+        self,
+        payload: dict[str, Any],
+        collection_cible: str,
+        expert_name: str | None = None,
+        source_file: str | None = None,
+        rag_result: dict[str, Any] | None = None,
+    ) -> int:
+        product_name = str(payload.get("nom_produit") or payload.get("nom") or "").strip()
+        if not product_name:
+            raise ValueError("nom_produit (ou nom) est obligatoire pour enregistrer la fiche produit")
+
+        timestamp = datetime.now(timezone.utc).isoformat()
+        with self.engine.begin() as conn:
+            result = conn.execute(
+                insert(product_cards_table).values(
+                    created_at=timestamp,
+                    updated_at=timestamp,
+                    expert_name=expert_name,
+                    product_name=product_name,
+                    collection_cible=str(collection_cible),
+                    source_file=source_file,
+                    payload_json=_json_dumps(payload),
+                    rag_result_json=_json_dumps(rag_result) if rag_result is not None else None,
+                )
+            )
+            return int(result.inserted_primary_key[0])
+
+    def get_product_card(self, record_id: int) -> dict[str, Any] | None:
+        with self.engine.begin() as conn:
+            row = conn.execute(
+                select(product_cards_table).where(product_cards_table.c.id == int(record_id))
+            ).mappings().first()
+        return self._decode_product_row(row) if row is not None else None
+
+    def list_product_cards(self, limit: int = 100) -> list[dict[str, Any]]:
+        with self.engine.begin() as conn:
+            rows = conn.execute(
+                select(product_cards_table).order_by(desc(product_cards_table.c.created_at)).limit(int(limit))
+            ).mappings().all()
+        return [self._decode_product_row(row) for row in rows]
 
     def create_history(
         self,
@@ -352,3 +424,4 @@ class CorrectionsStore:
         with self.engine.begin() as conn:
             conn.execute(delete(corrections_table))
             conn.execute(delete(history_table))
+            conn.execute(delete(product_cards_table))

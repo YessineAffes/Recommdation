@@ -203,3 +203,35 @@ def test_ingest_product_payload_new_optical_card_schema(tmp_path, monkeypatch):
     assert "La lumiere sous controle" in context
 
     rb._client.cache_clear()
+
+
+def test_product_card_is_persisted_in_store(tmp_store):
+    payload = {
+        "nom_produit": "Orma 1.50",
+        "concept": "La lumiere sous controle",
+        "plage_performance": {"min": -300, "max": 200},
+        "avantages": ["Protection UV"],
+        "recommande_pour": "Faibles ametropes",
+        "references": [],
+        "notes": [],
+    }
+    rag_result = {"ok": True, "collection": "types_verres", "id": "product_orma_150"}
+
+    record_id = tmp_store.add_product_card(
+        payload=payload,
+        collection_cible="types_verres",
+        expert_name="Dr Test",
+        source_file="product_orma_150.json",
+        rag_result=rag_result,
+    )
+
+    row = tmp_store.get_product_card(record_id)
+    assert row is not None
+    assert row["product_name"] == "Orma 1.50"
+    assert row["collection_cible"] == "types_verres"
+    assert row["payload_data"]["nom_produit"] == "Orma 1.50"
+    assert row["rag_result_data"]["ok"] is True
+
+    rows = tmp_store.list_product_cards(limit=5)
+    assert rows
+    assert rows[0]["id"] == record_id
