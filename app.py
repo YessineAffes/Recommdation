@@ -584,47 +584,54 @@ def _clean_int(value: Any) -> int | None:
         return None
 
 
-def _clean_reference_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    cleaned: list[dict[str, Any]] = []
-    for row in rows:
-        name = str(row.get("nom") or "").strip()
-        if not name:
-            continue
-        cleaned.append(
-            {
+def _parse_references_json(text: str) -> list[dict[str, Any]]:
+    try:
+        data = json.loads(text)
+        if not isinstance(data, list):
+            return []
+        cleaned: list[dict[str, Any]] = []
+        for row in data:
+            name = str(row.get("nom") or "").strip()
+            if not name:
+                continue
+            cleaned.append({
                 "nom": name,
                 "plage_stock": str(row.get("plage_stock") or "").strip(),
                 "cyl_200": _clean_int(row.get("cyl_200")),
                 "cyl_100": _clean_int(row.get("cyl_100")),
                 "spherique": _clean_int(row.get("spherique")),
-            }
-        )
-    return cleaned
+            })
+        return cleaned
+    except (json.JSONDecodeError, AttributeError):
+        return []
 
 
-def _clean_note_rows(rows: list[dict[str, Any]]) -> list[dict[str, str]]:
-    cleaned: list[dict[str, str]] = []
-    for row in rows:
-        title = str(row.get("titre") or "").strip()
-        content = str(row.get("contenu") or "").strip()
-        if title or content:
-            cleaned.append({"titre": title, "contenu": content})
-    return cleaned
+def _parse_notes_json(text: str) -> list[dict[str, str]]:
+    try:
+        data = json.loads(text)
+        if not isinstance(data, list):
+            return []
+        return [
+            {"titre": str(r.get("titre") or "").strip(), "contenu": str(r.get("contenu") or "").strip()}
+            for r in data if str(r.get("titre") or "").strip() or str(r.get("contenu") or "").strip()
+        ]
+    except (json.JSONDecodeError, AttributeError):
+        return []
 
 
 def _render_product_form(store: CorrectionsStore) -> None:
     st.subheader("Ajouter un produit")
     st.caption("Cree une fiche produit JSON structuree, l'enregistre localement et l'indexe dans le RAG.")
 
-    default_references = [
+    default_references_json = json.dumps([
         {"nom": "Crizal Alize+UV Tr Brun", "plage_stock": "-300 a +300", "cyl_200": 77, "cyl_100": 76, "spherique": 75},
         {"nom": "Crizal Alize+UV Tr Gris", "plage_stock": "-400 a +300", "cyl_200": 77, "cyl_100": 76, "spherique": 75},
-    ]
-    default_notes = [
+    ], indent=2, ensure_ascii=False)
+    default_notes_json = json.dumps([
         {"titre": "Brun Crizal Alize+UV disponible", "contenu": "D70 de -3.00 a plan Cyl 2.00 / D65 de +0.25 a +3.00 Cyl 2.00"},
         {"titre": "Gris Crizal Alize+UV disponible", "contenu": "D70 de -4.00 a plan Cyl 2.00 / D65 de +0.25 a +3.00 Cyl 2.00"},
         {"titre": "Disponibilite generale", "contenu": "En stock uniquement en Brun & Gris"},
-    ]
+    ], indent=2, ensure_ascii=False)
 
     with st.form("product_catalog_form"):
         left, right = st.columns([1, 1])
@@ -651,30 +658,17 @@ def _render_product_form(store: CorrectionsStore) -> None:
                 height=140,
             )
 
-        references = st.data_editor(
-            default_references,
-            key="product_references_editor",
-            hide_index=True,
-            num_rows="dynamic",
-            use_container_width=True,
-            column_config={
-                "nom": st.column_config.TextColumn("Reference", required=True),
-                "plage_stock": st.column_config.TextColumn("Plage stock"),
-                "cyl_200": st.column_config.NumberColumn("Cyl 200", step=1),
-                "cyl_100": st.column_config.NumberColumn("Cyl 100", step=1),
-                "spherique": st.column_config.NumberColumn("Spherique", step=1),
-            },
+        references_text = st.text_area(
+            "References (JSON)",
+            value=default_references_json,
+            height=160,
+            help='Liste JSON : [{"nom": "...", "plage_stock": "...", "cyl_200": 77, "cyl_100": 76, "spherique": 75}]',
         )
-        notes = st.data_editor(
-            default_notes,
-            key="product_notes_editor",
-            hide_index=True,
-            num_rows="dynamic",
-            use_container_width=True,
-            column_config={
-                "titre": st.column_config.TextColumn("Titre"),
-                "contenu": st.column_config.TextColumn("Contenu"),
-            },
+        notes_text = st.text_area(
+            "Notes (JSON)",
+            value=default_notes_json,
+            height=130,
+            help='Liste JSON : [{"titre": "...", "contenu": "..."}]',
         )
         submitted = st.form_submit_button("Creer et indexer le produit", use_container_width=True)
 
@@ -688,8 +682,8 @@ def _render_product_form(store: CorrectionsStore) -> None:
             "plage_performance": {"min": int(min_perf), "max": int(max_perf)},
             "avantages": _lines(avantages_text),
             "recommande_pour": recommande_pour.strip(),
-            "references": _clean_reference_rows(list(references)),
-            "notes": _clean_note_rows(list(notes)),
+            "references": _parse_references_json(references_text),
+            "notes": _parse_notes_json(notes_text),
         }
         PRODUCT_DOCS_PATH.mkdir(parents=True, exist_ok=True)
         filename = f"product_{_slug(nom_produit)}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
